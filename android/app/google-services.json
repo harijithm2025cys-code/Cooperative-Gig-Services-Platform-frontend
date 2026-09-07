@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "487510128852",
+    "project_id": "cooperative-gig-services-78bba",
+    "storage_bucket": "cooperative-gig-services-78bba.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:487510128852:android:a282f05d2d95ff76d5a341",
+        "android_client_info": {
+          "package_name": "com.brutex.cooperative_gig_services"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAhvWEP8iBZapQ_mTaGG6ZwBdakG_DSQE0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
