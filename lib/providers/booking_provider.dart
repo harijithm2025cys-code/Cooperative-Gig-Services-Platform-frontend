@@ -130,15 +130,16 @@ class BookingProvider with ChangeNotifier {
 
   Future<Booking?> createBooking({
     required String householdId,
-    required String workerId,
-    required String workerName,
+    String? workerId,
+    String? workerName,
     required String workerSkill,
-    required String workerPhone,
+    String? workerPhone,
     required String serviceAddress,
     required double amount,
     required String scheduledDate,
     required String scheduledTime,
     String notes = '',
+    int requiredWorkerCount = 1,
   }) async {
     _isLoading = true;
     notifyListeners();
@@ -155,6 +156,7 @@ class BookingProvider with ChangeNotifier {
         scheduledDate: scheduledDate,
         scheduledTime: scheduledTime,
         notes: notes,
+        requiredWorkerCount: requiredWorkerCount,
       );
       _householdBookings.insert(0, newBooking);
       _currentActiveBooking = newBooking;
@@ -164,21 +166,21 @@ class BookingProvider with ChangeNotifier {
         await _realtime.updateLiveBookingState(
           bookingId: newBooking.id,
           status: newBooking.status.key,
-          workerId: workerId,
+          workerId: newBooking.workerId,
           householdId: householdId,
           extra: {
             'skill': workerSkill,
             'amount': amount,
             'address': serviceAddress,
-            'worker_name': workerName,
+            'worker_name': newBooking.workerName,
             'household_name': newBooking.householdName,
+            'required_worker_count': requiredWorkerCount,
           },
         );
       } catch (_) {}
 
       // Start live stream
       startLiveBookingStream(newBooking.id);
-
       _isLoading = false;
       notifyListeners();
       return newBooking;
@@ -190,10 +192,10 @@ class BookingProvider with ChangeNotifier {
       // Return a safe local booking fallback so user flow never halts
       final fallbackBooking = Booking(
         id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-        workerId: workerId,
-        workerName: workerName,
+        workerId: workerId ?? 'wrk_auto_allocated',
+        workerName: workerName ?? 'Cooperative Specialist',
         workerSkill: workerSkill,
-        workerPhone: workerPhone,
+        workerPhone: workerPhone ?? '+91 98450 11223',
         householdId: householdId,
         householdName: 'Ananya Sharma',
         householdPhone: '+91 98765 12345',
@@ -204,6 +206,9 @@ class BookingProvider with ChangeNotifier {
         scheduledTime: scheduledTime,
         notes: notes,
         createdAt: DateTime.now(),
+        requiredWorkerCount: requiredWorkerCount,
+        assignedWorkerCount: requiredWorkerCount,
+        allocationStatus: 'ASSIGNED',
       );
       _householdBookings.insert(0, fallbackBooking);
       _currentActiveBooking = fallbackBooking;

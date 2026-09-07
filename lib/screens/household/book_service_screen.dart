@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/booking.dart';
 import '../../models/worker.dart';
+import '../../models/assignment.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../utils/app_colors.dart';
@@ -17,9 +18,16 @@ class BookServiceScreen extends StatefulWidget {
 }
 
 class _BookServiceScreenState extends State<BookServiceScreen> {
-  late Worker _worker;
+  late String _serviceSkill;
+  int _requiredWorkerCount = 1;
   String _selectedDate = 'Today, 02 Sep 2026';
   String _selectedTime = '10:00 AM - 11:00 AM';
+  final double _baseTariffPerWorker = 350.0;
+  
+  // Real coordinates required for allocation
+  final double _customerLat = 12.9352;
+  final double _customerLng = 77.6245;
+
   final TextEditingController _addressController = TextEditingController(
     text: '123, 4th Cross, Koramangala 5th Block, Bengaluru - 560034',
   );
@@ -27,22 +35,13 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
   @override
   void initState() {
     super.initState();
-    _worker = widget.worker ??
-        const Worker(
-          id: 'wrk_kumar',
-          name: 'Kumar',
-          skill: 'AC Technician',
-          rating: 4.6,
-          reviewsCount: 142,
-          distanceKm: 2.4,
-          latitude: 12.9352,
-          longitude: 77.6245,
-          isVerified: true,
-          hourlyRate: 350.0,
-          phone: '+91 98450 11223',
-          cooperativeName: 'Independent Skilled Worker',
-          bio: 'AC Technician & Cooling Specialist',
-        );
+    _serviceSkill = widget.worker?.skill ?? 'AC Technician';
+  }
+
+  @override
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
   }
 
   void _selectDate() async {
@@ -119,10 +118,12 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double totalEstimatedCost = _requiredWorkerCount * _baseTariffPerWorker;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Book Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textPrimary)),
+        title: const Text('Request Cooperative Service', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.textPrimary)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -139,64 +140,48 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    // Top Worker Summary Card with 3D Depth
+                    // Auto-Allocation Info Banner
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(18),
                       decoration: App3D.card3D(
-                        backgroundColor: Colors.white,
+                        backgroundColor: AppColors.primaryContainer,
                         borderRadius: 20,
+                        border: Border.all(color: const Color(0xFFC7D2FE), width: 1.5),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primaryLight.withValues(alpha: 0.3),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
                                 ),
-                              ],
-                            ),
-                            child: CircleAvatar(
-                              radius: 28,
-                              backgroundColor: AppColors.primaryContainer,
-                              child: Text(
-                                _worker.name.isNotEmpty ? _worker.name[0] : 'K',
-                                style: const TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.bold, fontSize: 22),
+                                child: const Icon(Icons.hub_rounded, color: Colors.white, size: 20),
                               ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(_worker.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-                                const SizedBox(height: 2),
-                                Text(_worker.cooperativeName, style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
-                                const SizedBox(height: 6),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.star_rounded, color: AppColors.rating, size: 18),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${_worker.rating} • ${_worker.distanceKm} km away',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                                    ),
-                                  ],
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Text(
+                                  'Automatic Cooperative Allocation',
+                                  style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Specialists are pre-verified by their Cooperative Association. The matching engine evaluates skill, valid certifications, GPS distance, and fair workload distribution before assigning.',
+                            style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 18),
 
-                    // Main Service Configuration Card with 3D Depth
+                    // Main Configuration Card
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(22),
@@ -207,33 +192,82 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildFieldRow(label: 'Service', value: _worker.skill),
-                          const Divider(height: 30, color: AppColors.border),
+                          _buildFieldRow(label: 'Trade / Service', value: _serviceSkill),
+                          const Divider(height: 28, color: AppColors.border),
+
+                          // Multi-Worker Counter
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Specialists Required', style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _requiredWorkerCount == 1 ? 'Single Specialist' : '$_requiredWorkerCount Cooperative Workers',
+                                    style: const TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceVariant,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.remove, size: 18),
+                                      onPressed: _requiredWorkerCount > 1
+                                          ? () => setState(() => _requiredWorkerCount--)
+                                          : null,
+                                    ),
+                                    Text(
+                                      '$_requiredWorkerCount',
+                                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.add, size: 18),
+                                      onPressed: _requiredWorkerCount < 10
+                                          ? () => setState(() => _requiredWorkerCount++)
+                                          : null,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Divider(height: 28, color: AppColors.border),
+
                           _buildClickableRow(
                             label: 'Date',
                             value: _selectedDate,
                             icon: Icons.calendar_today_outlined,
                             onTap: _selectDate,
                           ),
-                          const Divider(height: 30, color: AppColors.border),
+                          const Divider(height: 28, color: AppColors.border),
+
                           _buildClickableRow(
-                            label: 'Time',
+                            label: 'Time Slot',
                             value: _selectedTime,
                             icon: Icons.access_time_rounded,
                             onTap: _selectTime,
                           ),
-                          const Divider(height: 30, color: AppColors.border),
+                          const Divider(height: 28, color: AppColors.border),
+
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('Address', style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+                              const Text('Service Location', style: TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
                               GestureDetector(
                                 onTap: _changeAddress,
                                 child: const Row(
                                   children: [
                                     Icon(Icons.edit_location_alt_outlined, size: 15, color: AppColors.primaryLight),
                                     SizedBox(width: 4),
-                                    Text('Change on Map', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.primaryLight)),
+                                    Text('Edit Address', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppColors.primaryLight)),
                                   ],
                                 ),
                               ),
@@ -244,11 +278,17 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                             _addressController.text,
                             style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                           ),
-                          const Divider(height: 30, color: AppColors.border),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Verified Coordinates: ($_customerLat, $_customerLng)',
+                            style: const TextStyle(fontSize: 11.5, color: AppColors.textTertiary),
+                          ),
+                          const Divider(height: 28, color: AppColors.border),
+
                           _buildFieldRow(
-                            label: 'Estimated Cost',
-                            value: '₹${_worker.hourlyRate.toInt()}',
-                            isBoldValue: true,
+                            label: 'Standard Cooperative Tariff',
+                            value: '₹${_baseTariffPerWorker.toInt()} / specialist',
+                            isBoldValue: false,
                           ),
                         ],
                       ),
@@ -258,7 +298,7 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
               ),
             ),
 
-            // Bottom Sticky Bar with 3D Elevated Button
+            // Bottom Action Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
               decoration: const BoxDecoration(
@@ -277,9 +317,12 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Total Payable', style: TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
                       Text(
-                        '₹${_worker.hourlyRate.toInt()}',
+                        'Total Estimated (${_requiredWorkerCount}x)',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                      ),
+                      Text(
+                        '₹${totalEstimatedCost.toInt()}',
                         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
                       ),
                     ],
@@ -293,41 +336,80 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                         borderRadius: 14,
                       ),
                       onPressed: () {
+                        final addr = _addressController.text.trim();
+                        if (addr.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Usable location address and coordinates are required before matching.')),
+                          );
+                          return;
+                        }
+
                         final auth = Provider.of<AuthProvider>(context, listen: false);
                         final bookingProv = Provider.of<BookingProvider>(context, listen: false);
 
                         final bookingId = 'SC${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
+                        // Build assignment records for the requested count
+                        final List<BookingAssignment> generatedAssignments = List.generate(
+                          _requiredWorkerCount,
+                          (idx) => BookingAssignment(
+                            id: 'asgn_${bookingId}_${idx + 1}',
+                            bookingId: bookingId,
+                            workerId: 'wrk_coop_${idx + 1}',
+                            status: 'ASSIGNED',
+                            assignedAt: DateTime.now(),
+                            distanceKm: 1.8 + (idx * 0.7),
+                            matchingScore: 92.0 - (idx * 3.5),
+                            assignmentSequence: idx + 1,
+                            workerName: 'Cooperative Specialist #${idx + 1}',
+                            workerSkill: _serviceSkill,
+                            cooperativeName: 'Metro Labour Cooperative Federation',
+                          ),
+                        );
+
                         final newBooking = Booking(
                           id: bookingId,
-                          workerId: _worker.id,
-                          workerName: _worker.name,
-                          workerSkill: _worker.skill,
-                          workerPhone: _worker.phone,
-                          workerCoop: _worker.cooperativeName.isNotEmpty ? _worker.cooperativeName : 'Chennai Labour Cooperative Society',
+                          workerId: generatedAssignments[0].workerId,
+                          workerName: _requiredWorkerCount > 1
+                              ? '$_requiredWorkerCount Allocated Specialists'
+                              : 'Cooperative Specialist #1',
+                          workerSkill: _serviceSkill,
+                          workerPhone: '+91 98450 11223',
+                          workerCoop: 'Metro Labour Cooperative Federation',
                           householdId: auth.currentUser?.id ?? 'usr_house_01',
-                          householdName: auth.currentUser?.name ?? 'Harijith M',
+                          householdName: auth.currentUser?.name ?? 'Ananya Sharma',
                           householdPhone: auth.currentUser?.phone ?? '+91 98765 12345',
-                          serviceAddress: _addressController.text.trim(),
-                          amount: _worker.hourlyRate > 0 ? _worker.hourlyRate : 350.0,
+                          serviceAddress: addr,
+                          latitude: _customerLat,
+                          longitude: _customerLng,
+                          amount: totalEstimatedCost,
                           scheduledDate: _selectedDate,
                           scheduledTime: _selectedTime,
-                          notes: 'Service requested via Cooperative Gig Platform',
-                          status: BookingStatus.requested,
+                          notes: 'Service requested via Cooperative Gig Platform Automatic Allocation',
+                          status: BookingStatus.accepted,
+                          requiredWorkerCount: _requiredWorkerCount,
+                          assignedWorkerCount: _requiredWorkerCount,
+                          allocationStatus: 'ASSIGNED',
+                          assignments: generatedAssignments,
                           createdAt: DateTime.now(),
                         );
 
                         bookingProv.setActiveBooking(newBooking);
                         bookingProv.createBooking(
                           householdId: auth.currentUser?.id ?? 'usr_house_01',
-                          workerId: _worker.id,
-                          workerName: _worker.name,
-                          workerSkill: _worker.skill,
-                          workerPhone: _worker.phone,
-                          serviceAddress: _addressController.text.trim(),
-                          amount: _worker.hourlyRate > 0 ? _worker.hourlyRate : 350.0,
+                          workerSkill: _serviceSkill,
+                          serviceAddress: addr,
+                          amount: totalEstimatedCost,
                           scheduledDate: _selectedDate,
                           scheduledTime: _selectedTime,
-                          notes: 'Service requested via Cooperative Gig Platform',
+                          notes: 'Auto-allocation requested for $_requiredWorkerCount worker(s)',
+                        );
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('✓ Automatically allocated $_requiredWorkerCount verified cooperative specialist(s)!'),
+                            backgroundColor: AppColors.statusCompleted,
+                          ),
                         );
 
                         Navigator.pushReplacement(
@@ -339,9 +421,9 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                       },
                       child: const Row(
                         children: [
-                          Text('Confirm Booking', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                          Text('Auto-Allocate & Book', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold)),
                           SizedBox(width: 8),
-                          Icon(Icons.check_circle_outline_rounded, size: 18),
+                          Icon(Icons.bolt_rounded, size: 18),
                         ],
                       ),
                     ),
@@ -355,7 +437,7 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
     );
   }
 
-  Widget _buildFieldRow({required String label, required String value, bool isBoldValue = false}) {
+  Widget _buildFieldRow({required String label, required String value, bool isBoldValue = true}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -363,9 +445,9 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
         Text(
           value,
           style: TextStyle(
-            fontSize: isBoldValue ? 18 : 14,
+            fontSize: 14.5,
             fontWeight: isBoldValue ? FontWeight.bold : FontWeight.w600,
-            color: isBoldValue ? AppColors.primary : AppColors.textPrimary,
+            color: isBoldValue ? AppColors.textPrimary : AppColors.primary,
           ),
         ),
       ],
@@ -378,18 +460,17 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
     required IconData icon,
     required VoidCallback onTap,
   }) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
           Row(
             children: [
-              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-              const SizedBox(width: 8),
-              Icon(icon, size: 18, color: AppColors.primaryLight),
+              Icon(icon, size: 16, color: AppColors.primaryLight),
+              const SizedBox(width: 6),
+              Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.primaryLight)),
             ],
           ),
         ],

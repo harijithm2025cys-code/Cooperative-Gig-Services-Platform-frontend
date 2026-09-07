@@ -9,6 +9,7 @@ import '../models/booking.dart';
 import '../models/admin_stats.dart';
 import '../models/tariff.dart';
 import '../models/bulk_booking.dart';
+import '../models/assignment.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -675,10 +676,10 @@ class ApiService {
   // 4. POST /bookings/
   Future<Booking> createBooking({
     required String householdId,
-    required String workerId,
-    required String workerName,
+    String? workerId,
+    String? workerName,
     required String workerSkill,
-    required String workerPhone,
+    String? workerPhone,
     required String serviceAddress,
     required double amount,
     required String scheduledDate,
@@ -686,10 +687,13 @@ class ApiService {
     String notes = '',
     double lat = 12.9716,
     double lng = 77.5946,
+    int requiredWorkerCount = 1,
   }) async {
     final payload = {
       'household_id': householdId,
       'service_id': workerSkill.toLowerCase(),
+      'worker_id': workerId,
+      'required_worker_count': requiredWorkerCount,
       'latitude': lat,
       'longitude': lng,
       'address': serviceAddress,
@@ -705,21 +709,25 @@ class ApiService {
     } catch (_) {
       final newBooking = Booking(
         id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-        workerId: workerId,
-        workerName: workerName,
+        workerId: workerId ?? 'wrk_auto_allocated',
+        workerName: workerName ?? (requiredWorkerCount > 1 ? '$requiredWorkerCount Allocated Specialists' : 'Cooperative Specialist'),
         workerSkill: workerSkill,
-        workerPhone: workerPhone,
+        workerPhone: workerPhone ?? '+91 98450 11223',
+        workerCoop: 'Metro Labour Cooperative Federation',
         householdId: householdId,
-        householdName: 'Ananya Sharma',
-        householdPhone: '+91 98765 12345',
+        householdName: currentUser?.name ?? 'Ananya Sharma',
+        householdPhone: currentUser?.phone ?? '+91 98765 12345',
         serviceAddress: serviceAddress,
         latitude: lat,
         longitude: lng,
-        status: BookingStatus.requested,
+        status: BookingStatus.accepted,
         amount: amount,
         scheduledDate: scheduledDate,
         scheduledTime: scheduledTime,
         notes: notes,
+        requiredWorkerCount: requiredWorkerCount,
+        assignedWorkerCount: requiredWorkerCount,
+        allocationStatus: 'ASSIGNED',
         createdAt: DateTime.now(),
       );
       _mockBookings.insert(0, newBooking);
@@ -1232,5 +1240,121 @@ class ApiService {
       ]
     };
   }
+
+  // ==========================================
+  // PHASE 3: AUTOMATIC ALLOCATION & ASSIGNMENTS
+  // ==========================================
+
+  // 20. PUT /workers/{worker_id}/availability-status
+  Future<bool> updateWorkerAvailabilityStatus(String workerId, String status) async {
+    try {
+      final res = await _dio.put(
+        ApiConfig.workerAvailabilityStatus(workerId),
+        data: {'availability_status': status},
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('updateWorkerAvailabilityStatus API failed: $e');
+      return true; // gracefully fallback
+    }
+  }
+
+  // 21. GET /workers/{worker_id}/assignments
+  Future<List<BookingAssignment>> getWorkerAssignments(String workerId, {String? status}) async {
+    try {
+      final res = await _dio.get(
+        ApiConfig.workerAssignments(workerId),
+        queryParameters: status != null ? {'status_filter': status} : null,
+      );
+      if (res.data is Map && res.data['assignments'] is List) {
+        final list = res.data['assignments'] as List;
+        return list
+            .whereType<Map>()
+            .map((item) => BookingAssignment.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('getWorkerAssignments API failed: $e');
+    }
+
+    // Realistic fallback demonstration assignment for worker
+    return [
+      BookingAssignment(
+        id: 'asgn_demo_01',
+        bookingId: 'BK-1042',
+        workerId: workerId,
+        status: 'ASSIGNED',
+        distanceKm: 2.1,
+        matchingScore: 94.5,
+        assignmentSequence: 1,
+        serviceName: 'Certified Electrical Repair',
+        serviceAddress: '124, 7th Main, Indiranagar, Bengaluru',
+        scheduledTime: 'Today, 10:30 AM',
+        assignedAt: DateTime.now().subtract(const Duration(minutes: 15)),
+        cooperativeName: 'Bengaluru District Labour Federation',
+      ),
+    ];
+  }
+
+  // 22. POST /workers/{worker_id}/assignments/{assignment_id}/accept
+  Future<bool> acceptWorkerAssignment(String workerId, String assignmentId) async {
+    try {
+      final res = await _dio.post(ApiConfig.acceptAssignment(workerId, assignmentId));
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('acceptWorkerAssignment API failed: $e');
+      return true;
+    }
+  }
+
+  // 23. POST /workers/{worker_id}/assignments/{assignment_id}/reject
+  Future<bool> rejectWorkerAssignment(String workerId, String assignmentId, {String? reason}) async {
+    try {
+      final res = await _dio.post(
+        ApiConfig.rejectAssignment(workerId, assignmentId),
+        queryParameters: reason != null ? {'reason': reason} : null,
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('rejectWorkerAssignment API failed: $e');
+      return true;
+    }
+  }
+
+  // 24. POST /match/assign/{booking_id}
+  Future<Map<String, dynamic>> autoAllocateWorkers(String bookingId) async {
+    try {
+      final res = await _dio.post(ApiConfig.matchAssign(bookingId));
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('autoAllocateWorkers API failed: $e');
+    }
+    return {
+      'success': true,
+      'booking_id': bookingId,
+      'allocation_status': 'ASSIGNED',
+      'assigned_worker_count': 1,
+      'explanation': 'Auto-allocated verified cooperative specialist based on Haversine distance and fair distribution.',
+    };
+  }
+
+  // 25. GET /match/audit/{booking_id}
+  Future<List<MatchingAuditLog>> getMatchingAuditLogs(String bookingId) async {
+    try {
+      final res = await _dio.get(ApiConfig.matchAudit(bookingId));
+      if (res.data is List) {
+        return (res.data as List)
+            .whereType<Map>()
+            .map((item) => MatchingAuditLog.fromJson(Map<String, dynamic>.from(item)))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('getMatchingAuditLogs API failed: $e');
+    }
+    return [];
+  }
 }
+
 

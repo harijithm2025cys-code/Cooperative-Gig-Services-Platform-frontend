@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/booking.dart';
 import '../../models/user.dart';
+import '../../models/assignment.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
-import '../../services/location_service.dart';
+import '../../services/api_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/constants.dart';
 import '../../widgets/status_badge.dart';
@@ -18,7 +19,9 @@ class WorkerHomeScreen extends StatefulWidget {
 }
 
 class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
-  bool _isOnline = true;
+  String _availabilityStatus = 'available'; // available, unavailable, working, leave
+  List<BookingAssignment> _assignments = [];
+  bool _isLoadingAssignments = false;
 
   @override
   void initState() {
@@ -31,38 +34,95 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
   Future<void> _loadData() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final bookingProv = Provider.of<BookingProvider>(context, listen: false);
-    await bookingProv.fetchWorkerBookings(auth.currentUser?.id ?? 'wrk_1');
+    final workerId = auth.currentUser?.id ?? 'wrk_1';
+
+    await bookingProv.fetchWorkerBookings(workerId);
+    await _fetchAssignments(workerId);
   }
 
-  void _acceptBooking(Booking booking) async {
+  Future<void> _fetchAssignments(String workerId) async {
+    setState(() => _isLoadingAssignments = true);
+    try {
+      final list = await ApiService().getWorkerAssignments(workerId);
+      if (mounted) {
+        setState(() {
+          _assignments = list;
+          _isLoadingAssignments = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAssignments = false);
+    }
+  }
+
+  void _updateAvailability(String newStatus) async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    final bookingProv = Provider.of<BookingProvider>(context, listen: false);
-    final success = await bookingProv.updateStatus(booking.id, BookingStatus.accepted);
+    final workerId = auth.currentUser?.id ?? 'wrk_1';
+
+    setState(() => _availabilityStatus = newStatus);
+    await ApiService().updateWorkerAvailabilityStatus(workerId, newStatus);
     if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Availability status updated to: ${newStatus.toUpperCase()} (Cooperative verification preserved)'),
+        backgroundColor: newStatus == 'available' ? AppColors.statusCompleted : AppColors.primary,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _acceptAssignment(BookingAssignment asgn) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final workerId = auth.currentUser?.id ?? 'wrk_1';
+
+    final success = await ApiService().acceptWorkerAssignment(workerId, asgn.id);
+    if (!mounted) return;
+
     if (success) {
-      try {
-        await LocationService().startLiveTracking(
-          workerId: auth.currentUser?.id ?? 'wrk_1',
-          bookingId: booking.id,
-        );
-      } catch (_) {}
+      setState(() {
+        final idx = _assignments.indexWhere((a) => a.id == asgn.id);
+        if (idx != -1) {
+          _assignments[idx] = BookingAssignment(
+            id: asgn.id,
+            bookingId: asgn.bookingId,
+            workerId: asgn.workerId,
+            status: 'ACCEPTED',
+            distanceKm: asgn.distanceKm,
+            matchingScore: asgn.matchingScore,
+            assignmentSequence: asgn.assignmentSequence,
+            serviceName: asgn.serviceName,
+            serviceAddress: asgn.serviceAddress,
+            scheduledTime: asgn.scheduledTime,
+            assignedAt: asgn.assignedAt,
+            acceptedAt: DateTime.now(),
+            cooperativeName: asgn.cooperativeName,
+          );
+        }
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Accepted job #${booking.id}! Live GPS tracking started.'), backgroundColor: AppColors.statusAccepted),
-      );
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => WorkerActiveJobScreen(job: booking.copyWith(status: BookingStatus.accepted))),
+        SnackBar(
+          content: Text('✓ Accepted Gig #${asgn.bookingId}! Proceed to client address when scheduled.'),
+          backgroundColor: AppColors.statusCompleted,
+        ),
       );
     }
   }
 
-  void _declineBooking(Booking booking) async {
-    final bookingProv = Provider.of<BookingProvider>(context, listen: false);
-    final success = await bookingProv.updateStatus(booking.id, BookingStatus.rejected);
+  void _rejectAssignment(BookingAssignment asgn) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final workerId = auth.currentUser?.id ?? 'wrk_1';
+
+    final success = await ApiService().rejectWorkerAssignment(workerId, asgn.id, reason: 'Worker busy');
     if (!mounted) return;
+
     if (success) {
+      setState(() {
+        _assignments.removeWhere((a) => a.id == asgn.id);
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Job request declined.'), backgroundColor: AppColors.statusCancelled),
+        const SnackBar(content: Text('Assignment declined. Engine will re-route to next eligible co-op member.')),
       );
     }
   }
@@ -73,11 +133,12 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
     final bookingProv = Provider.of<BookingProvider>(context);
     final activeJob = bookingProv.activeWorkerJob;
     final incomingRequests = bookingProv.workerBookings.where((b) => b.status == BookingStatus.requested).toList();
+    final completedCount = bookingProv.workerBookings.where((b) => b.status == BookingStatus.completed).length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Worker-Owner Dashboard'),
+        title: const Text('Cooperative Worker Dashboard'),
         actions: [
           PopupMenuButton<UserRole>(
             icon: const Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
@@ -120,7 +181,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Worker Profile & Supabase DB Status
+              // Worker Profile & Association Verification Badge
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -139,23 +200,24 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(auth.currentUser?.name ?? 'Worker-Owner', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text(auth.currentUser?.cooperativeName ?? 'Labour Guild Member', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                          Text(auth.currentUser?.cooperativeName ?? 'Labour Cooperative Society', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                         ],
                       ),
                     ],
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryContainer,
-                      borderRadius: BorderRadius.circular(10),
+                      color: AppColors.statusCompletedBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.statusCompleted.withValues(alpha: 0.3)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_done_rounded, size: 13, color: AppColors.primaryDark),
+                        Icon(Icons.verified_rounded, size: 14, color: AppColors.statusCompleted),
                         SizedBox(width: 4),
-                        Text('Supabase Live', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
+                        Text('Association Verified', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.statusCompleted)),
                       ],
                     ),
                   ),
@@ -163,76 +225,78 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Online / Offline Toggle
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: const BorderSide(color: AppColors.border),
+              // Phase 3 4-State Availability Management Card
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: App3D.card3D(
+                  backgroundColor: Colors.white,
+                  borderRadius: 18,
                 ),
-                color: AppColors.surface,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _isOnline ? AppColors.statusCompleted : AppColors.textTertiary,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Operational Availability', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: _availabilityStatus == 'available'
+                                ? AppColors.statusCompletedBg
+                                : (_availabilityStatus == 'working' ? const Color(0xFFFEF3C7) : AppColors.surfaceVariant),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _availabilityStatus.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: _availabilityStatus == 'available'
+                                  ? AppColors.statusCompleted
+                                  : (_availabilityStatus == 'working' ? const Color(0xFFB45309) : AppColors.textSecondary),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(_isOnline ? 'Online & Available' : 'Offline', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-                              Text(_isOnline ? 'Receiving nearest co-op gig dispatches' : 'Toggle on to receive job requests', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                            ],
-                          ),
-                        ],
-                      ),
-                      Switch(
-                        value: _isOnline,
-                        activeTrackColor: AppColors.primary,
-                        activeThumbColor: Colors.white,
-                        onChanged: (val) {
-                          setState(() => _isOnline = val);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(val ? 'Status: Online' : 'Status: Offline'), duration: const Duration(seconds: 1)),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Changes allocation dispatch status only. Association membership & pre-verified status remain fully intact.',
+                      style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 4-Pill Availability Selector
+                    Row(
+                      children: [
+                        _buildStatusPill('Available', 'available', Icons.check_circle_rounded, AppColors.statusCompleted),
+                        const SizedBox(width: 8),
+                        _buildStatusPill('Working', 'working', Icons.build_circle_rounded, const Color(0xFFD97706)),
+                        const SizedBox(width: 8),
+                        _buildStatusPill('On Leave', 'leave', Icons.beach_access_rounded, const Color(0xFF6366F1)),
+                        const SizedBox(width: 8),
+                        _buildStatusPill('Offline', 'unavailable', Icons.do_not_disturb_on_rounded, AppColors.textTertiary),
+                      ],
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 18),
 
-              // Earnings Summary Card
-              _buildEarningsCard(),
-              const SizedBox(height: 24),
+              // Phase 3 Metrics Overview
+              _buildMetricsRow(
+                assignedCount: _assignments.length,
+                upcomingCount: incomingRequests.length,
+                completedCount: completedCount,
+              ),
+              const SizedBox(height: 20),
 
-              // Active Job Screen / Status Card (with Check-In / Check-Out shortcut)
-              if (activeJob != null) ...[
-                const Text('Active Assigned Gig', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
-                _buildActiveJobCard(activeJob),
-                const SizedBox(height: 24),
-              ],
-
-              // Incoming Job Requests (Accept / Reject)
+              // Phase 3 Automatically Allocated Jobs Section
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Incoming Job Requests',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-                  ),
+                  const Text('Assigned Gigs (Auto-Allocated)', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -240,7 +304,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${incomingRequests.length} Pending',
+                      '${_assignments.length} Allocated',
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
                     ),
                   ),
@@ -248,19 +312,227 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
               ),
               const SizedBox(height: 12),
 
-              if (incomingRequests.isEmpty)
-                _buildEmptyIncomingCard()
+              if (_isLoadingAssignments)
+                const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+              else if (_assignments.isEmpty)
+                _buildEmptyAssignmentsCard()
               else
-                ...incomingRequests.map((b) => _buildIncomingRequestCard(b)),
+                ..._assignments.map((asgn) => _buildAssignmentCard(asgn)),
 
               const SizedBox(height: 24),
 
-              // Job History / Schedule
-              const Text('All Scheduled & Past Gigs', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              // Active Job Screen / Status Card (with Check-In / Check-Out shortcut)
+              if (activeJob != null) ...[
+                const Text('Active Service Gig', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                _buildActiveJobCard(activeJob),
+                const SizedBox(height: 24),
+              ],
+
+              // Earnings Summary Card
+              _buildEarningsCard(),
+              const SizedBox(height: 24),
+
+              // Past Gigs
+              const Text('Completed Gig History', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               ...bookingProv.workerBookings
                   .where((b) => b.status != BookingStatus.requested)
                   .map((b) => _buildHistoryCard(b)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusPill(String label, String value, IconData icon, Color color) {
+    final bool isSelected = _availabilityStatus == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => _updateAvailability(value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withValues(alpha: 0.15) : AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isSelected ? color : AppColors.border,
+              width: isSelected ? 1.8 : 1.0,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 18, color: isSelected ? color : AppColors.textSecondary),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? color : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricsRow({
+    required int assignedCount,
+    required int upcomingCount,
+    required int completedCount,
+  }) {
+    return Row(
+      children: [
+        _buildMetricItem('Assigned Gigs', '$assignedCount', Icons.assignment_turned_in_rounded, AppColors.primary),
+        const SizedBox(width: 10),
+        _buildMetricItem('Upcoming', '$upcomingCount', Icons.pending_actions_rounded, const Color(0xFFD97706)),
+        const SizedBox(width: 10),
+        _buildMetricItem('Completed', '$completedCount', Icons.verified_rounded, AppColors.statusCompleted),
+        const SizedBox(width: 10),
+        _buildMetricItem('Workload', 'Balanced', Icons.balance_rounded, const Color(0xFF6366F1)),
+      ],
+    );
+  }
+
+  Widget _buildMetricItem(String title, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: App3D.card3D(
+          backgroundColor: Colors.white,
+          borderRadius: 14,
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 2),
+            Text(title, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssignmentCard(BookingAssignment asgn) {
+    final bool isAssigned = asgn.status == 'ASSIGNED';
+    final bool isAccepted = asgn.status == 'ACCEPTED';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: App3D.card3D(
+        backgroundColor: Colors.white,
+        borderRadius: 16,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryContainer,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Specialist #${asgn.assignmentSequence}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (asgn.distanceKm != null)
+                    Text(
+                      '${asgn.distanceKm!.toStringAsFixed(1)} km away',
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary, fontWeight: FontWeight.w600),
+                    ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isAccepted ? AppColors.statusCompletedBg : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  asgn.status,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: isAccepted ? AppColors.statusCompleted : const Color(0xFFB45309),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(asgn.serviceName ?? 'Cooperative Gig Service', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const SizedBox(height: 3),
+          Text(asgn.serviceAddress ?? 'Koramangala, Bengaluru', style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
+          const SizedBox(height: 4),
+          Text('Scheduled: ${asgn.scheduledTime ?? 'Today, Scheduled'}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+          if (asgn.matchingScore != null) ...[
+            const SizedBox(height: 4),
+            Text('Deterministic Ranking Score: ${asgn.matchingScore!.toStringAsFixed(1)} / 100', style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
+          ],
+
+          if (isAssigned) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.statusCancelled,
+                      side: const BorderSide(color: AppColors.statusCancelled),
+                    ),
+                    onPressed: () => _rejectAssignment(asgn),
+                    child: const Text('Decline'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.statusCompleted),
+                    onPressed: () => _acceptAssignment(asgn),
+                    child: const Text('Accept Gig', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyAssignmentsCard() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      color: AppColors.surface,
+      child: const Padding(
+        padding: EdgeInsets.all(20.0),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.check_circle_outline_rounded, size: 32, color: AppColors.statusCompleted),
+              SizedBox(height: 6),
+              Text('No pending assignments', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              SizedBox(height: 2),
+              Text('Automatic allocation engine will dispatch upcoming bookings here.', style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5)),
             ],
           ),
         ),
@@ -312,7 +584,7 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text('Quarterly Co-op Dividend: +₹1,250', style: TextStyle(color: AppColors.rating, fontSize: 12, fontWeight: FontWeight.bold)),
-              Text('Completed: 18 Gigs', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              Text('Fair Wage Protected', style: TextStyle(color: Colors.white70, fontSize: 12)),
             ],
           ),
         ],
@@ -345,80 +617,17 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
             const SizedBox(height: 2),
             Text(job.serviceAddress, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => WorkerActiveJobScreen(job: job)),
-                      );
-                    },
-                    child: const Text('Check-In / Out Details'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIncomingRequestCard(Booking booking) {
-    return Card(
-      elevation: 0,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      color: AppColors.surface,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Gig Request #${booking.id}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textTertiary)),
-                Text('₹${booking.amount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary)),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(booking.householdName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 2),
-            Text(booking.serviceAddress, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary)),
-            const SizedBox(height: 4),
-            Text('${booking.scheduledDate} • ${booking.scheduledTime}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
-            if (booking.notes.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Text('Note: "${booking.notes}"', style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: AppColors.textSecondary)),
-            ],
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.statusCancelled,
-                      side: const BorderSide(color: AppColors.statusCancelled),
-                    ),
-                    onPressed: () => _declineBooking(booking),
-                    child: const Text('Decline'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.statusAccepted),
-                    onPressed: () => _acceptBooking(booking),
-                    child: const Text('Accept Job'),
-                  ),
-                ),
-              ],
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => WorkerActiveJobScreen(job: job)),
+                  );
+                },
+                child: const Text('Check-In / Out Details'),
+              ),
             ),
           ],
         ),
@@ -446,31 +655,6 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
             const SizedBox(height: 4),
             Text('₹${booking.amount.toInt()}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyIncomingCard() {
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: AppColors.border),
-      ),
-      color: AppColors.surface,
-      child: const Padding(
-        padding: EdgeInsets.all(24.0),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(Icons.check_circle_outline_rounded, size: 36, color: AppColors.statusCompleted),
-              SizedBox(height: 8),
-              Text('All caught up!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              SizedBox(height: 2),
-              Text('New household requests will appear here automatically.', style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
-            ],
-          ),
         ),
       ),
     );

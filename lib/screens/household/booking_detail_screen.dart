@@ -1154,17 +1154,71 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Booking Details', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('Booking & Allocation Details', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.statusAcceptedBg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.statusAccepted.withValues(alpha: 0.3)),
+                ),
+                child: Text(
+                  booking.allocationStatus,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.statusAccepted),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
-          _buildDetailRow('Service:', booking.workerSkill),
+          _buildDetailRow('Service Category:', booking.workerSkill),
           const SizedBox(height: 10),
-          _buildDetailRow('Assigned Technician:', booking.workerName),
+          _buildDetailRow('Workers Requested:', '${booking.requiredWorkerCount} Specialist(s)'),
           const SizedBox(height: 10),
-          _buildDetailRow('Organization:', booking.workerCoop.isNotEmpty ? booking.workerCoop : 'Independent Professional'),
+          _buildDetailRow('Workers Assigned:', '${booking.assignedWorkerCount} Specialist(s)'),
           const SizedBox(height: 10),
-          _buildDetailRow('Scheduled:', '${booking.scheduledDate} · ${booking.scheduledTime}'),
+          _buildDetailRow('Cooperative Society:', booking.workerCoop.isNotEmpty ? booking.workerCoop : 'Bengaluru Labour Guild Co-op'),
           const SizedBox(height: 10),
-          _buildDetailRow('Address:', booking.serviceAddress),
+          _buildDetailRow('Scheduled Time:', '${booking.scheduledDate} · ${booking.scheduledTime}'),
+          const SizedBox(height: 10),
+          _buildDetailRow('Service Location:', booking.serviceAddress),
+          if (booking.assignments != null && booking.assignments!.isNotEmpty) ...[
+            const Divider(height: 24, color: AppColors.border),
+            const Text('Assigned Cooperative Specialists:', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            const SizedBox(height: 8),
+            ...booking.assignments!.map((asgn) => Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: AppColors.primary,
+                    child: Text('${asgn.assignmentSequence}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(asgn.workerName ?? 'Verified Specialist #${asgn.assignmentSequence}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
+                        Text('${asgn.workerSkill ?? booking.workerSkill} • ${asgn.status}', style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                  if (asgn.distanceKm != null)
+                    Text('${asgn.distanceKm!.toStringAsFixed(1)} km away', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.primaryLight)),
+                ],
+              ),
+            )),
+          ],
         ],
       ),
     );

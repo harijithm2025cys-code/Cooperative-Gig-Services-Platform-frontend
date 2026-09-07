@@ -1,4 +1,7 @@
+import 'assignment.dart';
+
 enum BookingStatus {
+
   requested,
   accepted,
   rejected,
@@ -183,6 +186,12 @@ class Booking {
   final DateTime? householdCheckoutTime;
   final DateTime? workerCheckoutTime;
 
+  // Phase 3 Multi-Worker Allocation & Tracking
+  final int requiredWorkerCount;
+  final int assignedWorkerCount;
+  final String allocationStatus;
+  final List<BookingAssignment>? assignments;
+
   const Booking({
     required this.id,
     required this.workerId,
@@ -220,6 +229,10 @@ class Booking {
     this.workerCheckinTime,
     this.householdCheckoutTime,
     this.workerCheckoutTime,
+    this.requiredWorkerCount = 1,
+    this.assignedWorkerCount = 0,
+    this.allocationStatus = 'REQUESTED',
+    this.assignments,
   });
 
   bool get bothVerifiedCheckin => householdVerifiedCheckin && workerVerifiedCheckin;
@@ -321,6 +334,10 @@ class Booking {
     'worker_live_lat': workerLiveLat,
     'worker_live_lng': workerLiveLng,
     'worker_last_seen': workerLastSeen?.toIso8601String(),
+    'required_worker_count': requiredWorkerCount,
+    'assigned_worker_count': assignedWorkerCount,
+    'allocation_status': allocationStatus,
+    'assignments': assignments?.map((a) => a.toJson()).toList(),
   };
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -334,6 +351,15 @@ class Booking {
       pStatus = PaymentStatus.refunded;
     } else if (ps == 'failed') {
       pStatus = PaymentStatus.failed;
+    }
+
+    final asgnsRaw = json['assignments'];
+    List<BookingAssignment>? parsedAssignments;
+    if (asgnsRaw is List && asgnsRaw.isNotEmpty) {
+      parsedAssignments = asgnsRaw
+          .whereType<Map>()
+          .map((item) => BookingAssignment.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
     }
 
     return Booking(
@@ -373,6 +399,12 @@ class Booking {
       workerCheckinTime: json['worker_checkin_time'] != null ? DateTime.tryParse(json['worker_checkin_time'].toString()) : null,
       householdCheckoutTime: json['household_checkout_time'] != null ? DateTime.tryParse(json['household_checkout_time'].toString()) : null,
       workerCheckoutTime: json['worker_checkout_time'] != null ? DateTime.tryParse(json['worker_checkout_time'].toString()) : null,
+      requiredWorkerCount: (json['required_worker_count'] is num) ? (json['required_worker_count'] as num).toInt() : 1,
+      assignedWorkerCount: (json['assigned_worker_count'] is num)
+          ? (json['assigned_worker_count'] as num).toInt()
+          : (parsedAssignments != null ? parsedAssignments.length : (json['worker_id'] != null && json['worker_id'] != '' ? 1 : 0)),
+      allocationStatus: json['allocation_status']?.toString() ?? (json['worker_id'] != null && json['worker_id'] != '' ? 'ASSIGNED' : 'REQUESTED'),
+      assignments: parsedAssignments,
     );
   }
 }

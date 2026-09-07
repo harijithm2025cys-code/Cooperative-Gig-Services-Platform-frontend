@@ -37,5 +37,13 @@ class ApiConfig {
   static const String emergencyBooking = '/bookings/emergency';
   static const String workloadFairness = '/admin/workload-fairness';
   static const String emergencyDispatches = '/admin/emergency-dispatches';
+
+  // Phase 3 Endpoints
+  static String matchAssign(String bookingId) => '/match/assign/$bookingId';
+  static String matchAudit(String bookingId) => '/match/audit/$bookingId';
+  static String workerAvailabilityStatus(String workerId) => '/workers/$workerId/availability-status';
+  static String workerAssignments(String workerId) => '/workers/$workerId/assignments';
+  static String acceptAssignment(String workerId, String asgnId) => '/workers/$workerId/assignments/$asgnId/accept';
+  static String rejectAssignment(String workerId, String asgnId) => '/workers/$workerId/assignments/$asgnId/reject';
 }
 
