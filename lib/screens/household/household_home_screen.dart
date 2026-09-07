@@ -9,6 +9,8 @@ import '../../utils/constants.dart';
 import '../../widgets/custom_map_widget.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/worker_card.dart';
+import '../../widgets/language_selector.dart';
+import '../../l10n/app_localizations.dart';
 import 'service_picker_screen.dart';
 import 'book_service_screen.dart';
 import 'bulk_booking_screen.dart';
@@ -69,8 +71,9 @@ class _HouseholdHomeScreenState extends State<HouseholdHomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Co-op Home Services'),
+        title: Text(AppLocalizations.of(context).appTitle.split(' ').take(3).join(' ')),
         actions: [
+          const LanguageSelector(compact: true),
           IconButton(
             icon: Icon(_showMap ? Icons.list_rounded : Icons.map_outlined, color: AppColors.primary),
             tooltip: _showMap ? 'List View' : 'Map View',

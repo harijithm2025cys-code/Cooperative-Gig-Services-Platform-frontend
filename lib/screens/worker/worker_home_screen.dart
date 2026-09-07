@@ -9,6 +9,8 @@ import '../../services/api_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/constants.dart';
 import '../../widgets/status_badge.dart';
+import '../../widgets/language_selector.dart';
+import '../../l10n/app_localizations.dart';
 import 'worker_active_job_screen.dart';
 
 class WorkerHomeScreen extends StatefulWidget {
@@ -138,8 +140,9 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Cooperative Worker Dashboard'),
+        title: Text(AppLocalizations.of(context).workerPortal),
         actions: [
+          const LanguageSelector(compact: true),
           PopupMenuButton<UserRole>(
             icon: const Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
             tooltip: 'Switch Portal Persona',

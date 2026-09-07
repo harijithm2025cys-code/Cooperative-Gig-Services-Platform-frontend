@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:cooperative_gig_services/main.dart';
+import 'package:cooperative_gig_services/providers/locale_provider.dart';
 import 'package:cooperative_gig_services/providers/auth_provider.dart';
 import 'package:cooperative_gig_services/providers/worker_provider.dart';
 import 'package:cooperative_gig_services/providers/booking_provider.dart';
@@ -11,6 +12,7 @@ void main() {
     await tester.pumpWidget(
       MultiProvider(
         providers: [
+          ChangeNotifierProvider(create: (_) => LocaleProvider()),
           ChangeNotifierProvider(create: (_) => AuthProvider()),
           ChangeNotifierProvider(create: (_) => WorkerProvider()),
           ChangeNotifierProvider(create: (_) => BookingProvider()),

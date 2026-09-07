@@ -4,6 +4,8 @@ import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/constants.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/language_selector.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -121,36 +123,43 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Top Row with Discreet Admin Access
+                      // Top Row with Language Switcher and Discreet Admin Access
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryContainer.withValues(alpha: 0.6),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Row(
-                              children: [
-                                Icon(Icons.cloud_done_rounded, size: 12, color: AppColors.primaryDark),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Supabase Cloud DB',
-                                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                          const LanguageSelector(compact: true),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryContainer.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
-                              ],
-                            ),
-                          ),
-                          // Hidden/discreet admin lock toggle
-                          IconButton(
-                            icon: Icon(
-                              _isAdminMode ? Icons.admin_panel_settings : Icons.lock_outline_rounded,
-                              size: 19,
-                              color: _isAdminMode ? AppColors.primary : AppColors.textTertiary,
-                            ),
-                            tooltip: _isAdminMode ? 'Exit Admin Mode' : 'Admin Portal Access',
-                            onPressed: _toggleAdminMode,
+                                child: const Row(
+                                  children: [
+                                    Icon(Icons.cloud_done_rounded, size: 12, color: AppColors.primaryDark),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'Supabase DB',
+                                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              // Hidden/discreet admin lock toggle
+                              IconButton(
+                                icon: Icon(
+                                  _isAdminMode ? Icons.admin_panel_settings : Icons.lock_outline_rounded,
+                                  size: 19,
+                                  color: _isAdminMode ? AppColors.primary : AppColors.textTertiary,
+                                ),
+                                tooltip: _isAdminMode ? 'Exit Admin Mode' : 'Admin Portal Access',
+                                onPressed: _toggleAdminMode,
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -175,7 +184,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 14),
                       Center(
                         child: Text(
-                          _isAdminMode ? 'Cooperative Admin Portal' : 'Cooperative Sign In',
+                          _isAdminMode
+                              ? 'Cooperative Admin Portal'
+                              : AppLocalizations.of(context).login,
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -187,8 +198,11 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 4),
                       Center(
                         child: Text(
-                          _isAdminMode ? 'Authorised Guild Staff & Auditors Only' : 'Member-Owned Labour Platform',
+                          _isAdminMode
+                              ? 'Authorised Guild Staff & Auditors Only'
+                              : AppLocalizations.of(context).appTagline,
                           style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                          textAlign: TextAlign.center,
                         ),
                       ),
                       const SizedBox(height: 20),

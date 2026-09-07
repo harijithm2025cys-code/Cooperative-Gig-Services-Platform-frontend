@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/admin_provider.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/constants.dart';
+import '../../widgets/language_selector.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -150,6 +151,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> with Single
         foregroundColor: Colors.white,
         elevation: 2,
         actions: [
+          const LanguageSelector(compact: true, textColor: Colors.white),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh Data',
