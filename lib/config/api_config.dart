@@ -45,5 +45,17 @@ class ApiConfig {
   static String workerAssignments(String workerId) => '/workers/$workerId/assignments';
   static String acceptAssignment(String workerId, String asgnId) => '/workers/$workerId/assignments/$asgnId/accept';
   static String rejectAssignment(String workerId, String asgnId) => '/workers/$workerId/assignments/$asgnId/reject';
+
+  // Phase 4 Endpoints
+  static String cancelBooking(String id) => '/bookings/$id/cancel';
+  static String assignmentLocation(String asgnId) => '/bookings/assignments/$asgnId/location';
+  static String workerStartJourney(String workerId, String asgnId) => '/workers/$workerId/assignments/$asgnId/start-journey';
+  static String workerArrive(String workerId, String asgnId) => '/workers/$workerId/assignments/$asgnId/arrive';
+  static String workerStartService(String workerId, String asgnId) => '/workers/$workerId/assignments/$asgnId/start-service';
+  static String workerCompleteService(String workerId, String asgnId) => '/workers/$workerId/assignments/$asgnId/complete-service';
+  static const String notifications = '/notifications/';
+  static const String notificationsUnreadCount = '/notifications/unread-count';
+  static String notificationMarkRead(String id) => '/notifications/$id/read';
+  static const String notificationsMarkAllRead = '/notifications/mark-all-read';
 }
 

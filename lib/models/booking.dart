@@ -191,6 +191,9 @@ class Booking {
   final int assignedWorkerCount;
   final String allocationStatus;
   final List<BookingAssignment>? assignments;
+  final bool isEmergency;
+  final String? cancellationReason;
+  final String? etaFormatted;
 
   const Booking({
     required this.id,
@@ -233,6 +236,9 @@ class Booking {
     this.assignedWorkerCount = 0,
     this.allocationStatus = 'REQUESTED',
     this.assignments,
+    this.isEmergency = false,
+    this.cancellationReason,
+    this.etaFormatted,
   });
 
   bool get bothVerifiedCheckin => householdVerifiedCheckin && workerVerifiedCheckin;
@@ -260,6 +266,9 @@ class Booking {
     DateTime? workerCheckinTime,
     DateTime? householdCheckoutTime,
     DateTime? workerCheckoutTime,
+    bool? isEmergency,
+    String? cancellationReason,
+    String? etaFormatted,
   }) {
     return Booking(
       id: id,
@@ -298,6 +307,13 @@ class Booking {
       workerCheckinTime: workerCheckinTime ?? this.workerCheckinTime,
       householdCheckoutTime: householdCheckoutTime ?? this.householdCheckoutTime,
       workerCheckoutTime: workerCheckoutTime ?? this.workerCheckoutTime,
+      requiredWorkerCount: requiredWorkerCount,
+      assignedWorkerCount: assignedWorkerCount,
+      allocationStatus: allocationStatus,
+      assignments: assignments,
+      isEmergency: isEmergency ?? this.isEmergency,
+      cancellationReason: cancellationReason ?? this.cancellationReason,
+      etaFormatted: etaFormatted ?? this.etaFormatted,
     );
   }
 
@@ -338,6 +354,9 @@ class Booking {
     'assigned_worker_count': assignedWorkerCount,
     'allocation_status': allocationStatus,
     'assignments': assignments?.map((a) => a.toJson()).toList(),
+    'is_emergency': isEmergency,
+    'cancellation_reason': cancellationReason,
+    'eta_formatted': etaFormatted,
   };
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -405,6 +424,9 @@ class Booking {
           : (parsedAssignments != null ? parsedAssignments.length : (json['worker_id'] != null && json['worker_id'] != '' ? 1 : 0)),
       allocationStatus: json['allocation_status']?.toString() ?? (json['worker_id'] != null && json['worker_id'] != '' ? 'ASSIGNED' : 'REQUESTED'),
       assignments: parsedAssignments,
+      isEmergency: json['is_emergency'] == true || json['is_emergency']?.toString().toLowerCase() == 'true',
+      cancellationReason: json['cancellation_reason']?.toString(),
+      etaFormatted: json['eta_formatted']?.toString(),
     );
   }
 }

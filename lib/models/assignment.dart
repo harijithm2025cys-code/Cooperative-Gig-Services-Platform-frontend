@@ -85,6 +85,48 @@ class BookingAssignment {
       'cooperative_name': cooperativeName,
     };
   }
+
+  BookingAssignment copyWith({
+    String? id,
+    String? bookingId,
+    String? workerId,
+    String? status,
+    DateTime? assignedAt,
+    DateTime? acceptedAt,
+    DateTime? rejectedAt,
+    DateTime? completedAt,
+    double? distanceKm,
+    double? matchingScore,
+    int? assignmentSequence,
+    String? workerName,
+    String? workerPhone,
+    String? workerSkill,
+    String? cooperativeName,
+    String? serviceName,
+    String? serviceAddress,
+    String? scheduledTime,
+  }) {
+    return BookingAssignment(
+      id: id ?? this.id,
+      bookingId: bookingId ?? this.bookingId,
+      workerId: workerId ?? this.workerId,
+      status: status ?? this.status,
+      assignedAt: assignedAt ?? this.assignedAt,
+      acceptedAt: acceptedAt ?? this.acceptedAt,
+      rejectedAt: rejectedAt ?? this.rejectedAt,
+      completedAt: completedAt ?? this.completedAt,
+      distanceKm: distanceKm ?? this.distanceKm,
+      matchingScore: matchingScore ?? this.matchingScore,
+      assignmentSequence: assignmentSequence ?? this.assignmentSequence,
+      workerName: workerName ?? this.workerName,
+      workerPhone: workerPhone ?? this.workerPhone,
+      workerSkill: workerSkill ?? this.workerSkill,
+      cooperativeName: cooperativeName ?? this.cooperativeName,
+      serviceName: serviceName ?? this.serviceName,
+      serviceAddress: serviceAddress ?? this.serviceAddress,
+      scheduledTime: scheduledTime ?? this.scheduledTime,
+    );
+  }
 }
 
 class MatchingAuditLog {

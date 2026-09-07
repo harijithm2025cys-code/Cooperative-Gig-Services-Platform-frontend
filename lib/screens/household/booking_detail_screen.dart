@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/booking.dart';
 import '../../providers/booking_provider.dart';
 import '../../services/location_service.dart';
+import '../../services/api_service.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/custom_map_widget.dart';
 import 'rate_worker_dialog.dart';
@@ -205,6 +206,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
   Future<void> _handleVerifyCheckIn(Booking booking) async {
     final pos = await LocationService().getCurrentPosition();
+    if (!mounted) return;
     final otp = _otpController.text.trim();
     if (otp.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -670,6 +672,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             children: [
               _buildHeroCard(booking),
               const SizedBox(height: 20),
+              _buildEtaAndTrackingCard(booking),
+              if (booking.requiredWorkerCount > 1) ...[
+                const SizedBox(height: 20),
+                _buildMultiWorkerStatusCard(booking),
+              ],
+              const SizedBox(height: 20),
               _buildStepperCard(step, booking),
               const SizedBox(height: 20),
               _buildOtpCard(booking),
@@ -680,7 +688,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               const SizedBox(height: 24),
 
               // Direct Confirmation & Payment Flow (Customer + Worker Dual Confirmation)
-              if (booking.status != BookingStatus.completed && booking.paymentStatus != PaymentStatus.released) ...[
+              if (booking.status != BookingStatus.completed && booking.paymentStatus != PaymentStatus.released && booking.status != BookingStatus.cancelled) ...[
                 if (!booking.householdVerifiedCheckout) ...[
                   SizedBox(
                     width: double.infinity,
@@ -753,6 +761,51 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     onPressed: () => _openPaymentModal(booking),
                   ),
                 ),
+                // Pre-service Customer Cancellation Action
+                if (booking.status == BookingStatus.requested ||
+                    booking.status == BookingStatus.accepted ||
+                    booking.status == BookingStatus.workerEnroute ||
+                    booking.status == BookingStatus.arrived) ...[
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.statusCancelled,
+                        side: const BorderSide(color: AppColors.statusCancelled, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                      label: const Text('Cancel Booking (Free Before Service Starts)',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                      onPressed: () => _openCancelConfirmation(booking),
+                    ),
+                  ),
+                ],
+              ] else if (booking.status == BookingStatus.cancelled) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: App3D.card3D(
+                    backgroundColor: const Color(0xFFFEE2E2),
+                    borderRadius: 18,
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.cancel_outlined, color: AppColors.statusCancelled, size: 36),
+                      const SizedBox(height: 8),
+                      const Text('Booking Cancelled',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF991B1B))),
+                      const SizedBox(height: 4),
+                      Text(
+                        booking.cancellationReason ?? 'This request was cancelled. No charges have been applied.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12.5, color: Color(0xFF991B1B)),
+                      ),
+                    ],
+                  ),
+                ),
               ] else ...[
                 // When Completed & Paid
                 Container(
@@ -797,34 +850,228 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
+  void _openCancelConfirmation(Booking booking) {
+    final reasonController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: AppColors.statusCancelled, size: 24),
+            SizedBox(width: 8),
+            Text('Cancel Booking?', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Cancellation is free of charge before service starts. Any assigned cooperative specialists will be immediately reallocated.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: reasonController,
+              decoration: InputDecoration(
+                hintText: 'Reason for cancellation (optional)',
+                hintStyle: const TextStyle(fontSize: 12.5),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: AppColors.surfaceVariant,
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Keep Booking'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.statusCancelled),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              setState(() => _isProcessing = true);
+              final reason = reasonController.text.trim();
+              await ApiService().cancelCustomerBooking(booking.id, reason: reason.isNotEmpty ? reason : null);
+              if (!mounted) return;
+              final updated = booking.copyWith(
+                status: BookingStatus.cancelled,
+                cancellationReason: reason.isNotEmpty ? reason : 'Customer cancelled',
+              );
+              Provider.of<BookingProvider>(context, listen: false).setActiveBooking(updated);
+              setState(() {
+                _isProcessing = false;
+                _booking = updated;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('✓ Booking cancelled successfully. Specialist released.'),
+                  backgroundColor: AppColors.statusCancelled,
+                ),
+              );
+            },
+            child: const Text('Confirm Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEtaAndTrackingCard(Booking booking) {
+    final bool isTracking = booking.status == BookingStatus.workerEnroute ||
+        booking.status == BookingStatus.accepted ||
+        booking.status == BookingStatus.arrived;
+    if (!isTracking) return const SizedBox.shrink();
+
+    final String etaDisplay = booking.etaFormatted ??
+        (booking.status == BookingStatus.arrived
+            ? 'Arrived at your doorstep'
+            : '~12 mins (approx. 5.1 km @ 25 km/h)');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: App3D.card3D(
+        backgroundColor: Colors.white,
+        borderRadius: 20,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.navigation_rounded, color: AppColors.primaryDark, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Live ETA & Journey Tracking',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
+                    const SizedBox(height: 2),
+                    Text(
+                      booking.status == BookingStatus.arrived
+                          ? 'Specialist has arrived at your premises'
+                          : 'Realistic transit estimate (25 km/h city average)',
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.access_time_filled_rounded, color: AppColors.primaryDark, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    etaDisplay,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.textPrimary),
+                  ),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.map_outlined, size: 16),
+                  label: const Text('Live Map', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                  onPressed: () => _openLiveMapModal(booking),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMultiWorkerStatusCard(Booking booking) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.groups_rounded, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Multi-Specialist Team: ${booking.assignedWorkerCount} of ${booking.requiredWorkerCount} Allocated',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Each cooperative specialist operates with independent arrival and check-in confirmation.',
+            style: TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeroCard(Booking booking) {
+    final bool isCancelled = booking.status == BookingStatus.cancelled;
     final bool isDone = booking.status == BookingStatus.completed;
     final bool isPending = booking.status == BookingStatus.requested;
     final bool isEnroute = booking.status == BookingStatus.accepted || booking.status == BookingStatus.workerEnroute;
-    final Color heroColor = isDone
-        ? AppColors.statusCompleted
+    final Color heroColor = isCancelled
+        ? AppColors.statusCancelled
+        : isDone
+            ? AppColors.statusCompleted
+            : isPending
+                ? AppColors.primary
+                : isEnroute
+                    ? AppColors.statusAccepted
+                    : AppColors.statusInProgress;
+    final IconData heroIcon = isCancelled
+        ? Icons.cancel_outlined
+        : isDone
+            ? Icons.check
+            : isPending
+                ? Icons.hourglass_top_rounded
+                : isEnroute
+                    ? Icons.two_wheeler_rounded
+                    : Icons.build_rounded;
+    final String heroTitle = isCancelled
+        ? 'Booking Cancelled'
+        : isDone
+            ? 'Booking Completed!'
+            : isPending
+                ? 'Request Sent to Worker'
+                : isEnroute
+                    ? 'Worker Dispatched'
+                    : booking.status.label;
+    final String heroSub = isCancelled
+        ? (booking.cancellationReason ?? 'This booking was cancelled and specialists released.')
         : isPending
-            ? AppColors.primary
-            : isEnroute
-                ? AppColors.statusAccepted
-                : AppColors.statusInProgress;
-    final IconData heroIcon = isDone
-        ? Icons.check
-        : isPending
-            ? Icons.hourglass_top_rounded
-            : isEnroute
-                ? Icons.two_wheeler_rounded
-                : Icons.build_rounded;
-    final String heroTitle = isDone
-        ? 'Booking Completed!'
-        : isPending
-            ? 'Request Sent to Worker'
-            : isEnroute
-                ? 'Worker Dispatched'
-                : booking.status.label;
-    final String heroSub = isPending
-        ? 'Waiting for ${booking.workerName} to accept your request…'
-        : 'Order #${booking.id} • ${booking.workerSkill}';
+            ? 'Waiting for ${booking.workerName} to accept your request…'
+            : 'Order #${booking.id} • ${booking.workerSkill}';
 
     return Container(
       width: double.infinity,

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/booking.dart';
 import '../../providers/booking_provider.dart';
 import '../../services/location_service.dart';
+import '../../services/api_service.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/custom_map_widget.dart';
 import '../../widgets/status_badge.dart';
@@ -78,6 +79,7 @@ class _WorkerActiveJobScreenState extends State<WorkerActiveJobScreen> {
 
   Future<void> _handleVerifyCheckIn() async {
     final pos = await LocationService().getCurrentPosition();
+    if (!mounted) return;
     final otp = _otpController.text.trim();
     if (otp.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -431,6 +433,35 @@ class _WorkerActiveJobScreenState extends State<WorkerActiveJobScreen> {
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                         : const Text('I Have Arrived at Location', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     onPressed: _isProcessing ? null : _handleArrived,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.my_location_rounded, size: 18),
+                    label: const Text('Transmit Live GPS Location to Customer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    onPressed: () async {
+                      final pos = await LocationService().getCurrentPosition();
+                      if (pos != null) {
+                        await ApiService().pushWorkerAssignmentLocation(
+                          assignmentId: _job.id,
+                          latitude: pos.latitude,
+                          longitude: pos.longitude,
+                          bookingId: _job.id,
+                          workerId: _job.workerId,
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('✓ Live GPS transmitted. Customer tracking map and ETA updated.'),
+                              backgroundColor: AppColors.primary,
+                            ),
+                          );
+                        }
+                      }
+                    },
                   ),
                 ),
               ] else if (_job.status == BookingStatus.arrived ||

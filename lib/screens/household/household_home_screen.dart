@@ -9,11 +9,10 @@ import '../../utils/constants.dart';
 import '../../widgets/custom_map_widget.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/worker_card.dart';
-import '../../services/api_service.dart';
 import 'service_picker_screen.dart';
 import 'book_service_screen.dart';
-import 'booking_detail_screen.dart';
 import 'bulk_booking_screen.dart';
+import 'emergency_booking_screen.dart';
 
 class HouseholdHomeScreen extends StatefulWidget {
   const HouseholdHomeScreen({super.key});
@@ -54,49 +53,9 @@ class _HouseholdHomeScreenState extends State<HouseholdHomeScreen> {
   }
 
   void _triggerEmergencySos() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: const [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
-            SizedBox(width: 8),
-            Text('24/7 Emergency SOS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          ],
-        ),
-        content: const Text(
-          'Dispatch nearest verified cooperative emergency technician immediately?\n\n• Response SLA: Under 15 minutes\n• Tariff: Standard + 25% emergency rate\n• Dual OTP check-in protected',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            icon: const Icon(Icons.bolt, size: 18),
-            label: const Text('DISPATCH NOW'),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('🚨 Emergency SOS Dispatched! Finding closest specialist...'), backgroundColor: Colors.red),
-              );
-              final emgBooking = await ApiService().createEmergencyBooking(
-                serviceSkill: 'Electrician',
-                address: '123, 4th Cross, Koramangala 5th Block, Bengaluru',
-                latitude: 12.9716,
-                longitude: 77.5946,
-                notes: 'EMERGENCY DISPATCH: Urgent short circuit / water leak.',
-              );
-              if (!mounted) return;
-              Provider.of<BookingProvider>(context, listen: false).setActiveBooking(emgBooking);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => BookingDetailScreen(booking: emgBooking)),
-              );
-            },
-          ),
-        ],
-      ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const EmergencyBookingScreen()),
     );
   }
 
