@@ -66,6 +66,27 @@ class AdminProvider with ChangeNotifier {
   Map<String, dynamic>? get adminAnalytics => _adminAnalytics;
 
   // =========================================================================
+  // Phase 7: Real Analytics & ML Foundation State
+  // =========================================================================
+  String _selectedDateRange = 'last_30_days';
+  Map<String, dynamic>? _platformKpis;
+  Map<String, dynamic>? _phase7AssociationAnalytics;
+  Map<String, dynamic>? _serviceDemand;
+  List<Map<String, dynamic>> _workerUtilizationList = [];
+  Map<String, dynamic>? _matchingAnalytics;
+  Map<String, dynamic>? _geographicDemand;
+  Map<String, dynamic>? _dataQualityReport;
+
+  String get selectedDateRange => _selectedDateRange;
+  Map<String, dynamic>? get platformKpis => _platformKpis;
+  Map<String, dynamic>? get phase7AssociationAnalytics => _phase7AssociationAnalytics;
+  Map<String, dynamic>? get serviceDemand => _serviceDemand;
+  List<Map<String, dynamic>> get workerUtilizationList => _workerUtilizationList;
+  Map<String, dynamic>? get matchingAnalytics => _matchingAnalytics;
+  Map<String, dynamic>? get geographicDemand => _geographicDemand;
+  Map<String, dynamic>? get dataQualityReport => _dataQualityReport;
+
+  // =========================================================================
   // Association Head Data Fetching & Mutations
   // =========================================================================
   Future<void> fetchAssociationData({String? cooperativeId}) async {
@@ -353,5 +374,134 @@ class AdminProvider with ChangeNotifier {
       disputes: updatedDisputes,
     );
     notifyListeners();
+  }
+
+  // =========================================================================
+  // Phase 7: Analytics & Historical Data Fetching Methods
+  // =========================================================================
+
+  Future<void> setDateRange(
+    String rangeType, {
+    String? cooperativeId,
+    bool isSuperAdmin = false,
+    String? startDate,
+    String? endDate,
+  }) async {
+    _selectedDateRange = rangeType;
+    notifyListeners();
+    await fetchPhase7Analytics(
+      cooperativeId: cooperativeId,
+      isSuperAdmin: isSuperAdmin,
+      startDate: startDate,
+      endDate: endDate,
+    );
+  }
+
+  Future<void> fetchPhase7Analytics({
+    String? cooperativeId,
+    bool isSuperAdmin = false,
+    String? startDate,
+    String? endDate,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      if (isSuperAdmin) {
+        final results = await Future.wait([
+          _api.getPlatformKpis(rangeType: _selectedDateRange, startDate: startDate, endDate: endDate),
+          _api.getServiceDemandAnalytics(rangeType: _selectedDateRange, startDate: startDate, endDate: endDate),
+          _api.getWorkerUtilizationAnalytics(rangeType: _selectedDateRange),
+          _api.getGeographicDemandAnalytics(rangeType: _selectedDateRange),
+          _api.getMatchingAnalytics(rangeType: _selectedDateRange),
+          _api.getDataQualityReport(),
+        ]);
+
+        _platformKpis = results[0];
+        _serviceDemand = results[1];
+        final wData = results[2];
+        if (wData != null && wData['workers'] is List) {
+          _workerUtilizationList = (wData['workers'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        }
+        _geographicDemand = results[3];
+        _matchingAnalytics = results[4];
+        _dataQualityReport = results[5];
+      } else if (cooperativeId != null) {
+        final results = await Future.wait([
+          _api.getAssociationScopedAnalytics(cooperativeId: cooperativeId, rangeType: _selectedDateRange, startDate: startDate, endDate: endDate),
+          _api.getServiceDemandAnalytics(cooperativeId: cooperativeId, rangeType: _selectedDateRange, startDate: startDate, endDate: endDate),
+          _api.getWorkerUtilizationAnalytics(cooperativeId: cooperativeId, rangeType: _selectedDateRange),
+          _api.getGeographicDemandAnalytics(cooperativeId: cooperativeId, rangeType: _selectedDateRange),
+          _api.getMatchingAnalytics(cooperativeId: cooperativeId, rangeType: _selectedDateRange),
+        ]);
+
+        _phase7AssociationAnalytics = results[0];
+        _serviceDemand = results[1];
+        final wData = results[2];
+        if (wData != null && wData['workers'] is List) {
+          _workerUtilizationList = (wData['workers'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        }
+        _geographicDemand = results[3];
+        _matchingAnalytics = results[4];
+      }
+    } catch (e) {
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchWorkerUtilizationList({
+    String? cooperativeId,
+    String? search,
+    int page = 1,
+  }) async {
+    try {
+      final res = await _api.getWorkerUtilizationAnalytics(
+        cooperativeId: cooperativeId,
+        search: search,
+        page: page,
+        rangeType: _selectedDateRange,
+      );
+      if (res != null && res['workers'] is List) {
+        _workerUtilizationList = (res['workers'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchWorkerUtilizationList error: $e');
+    }
+  }
+
+  Future<void> fetchMatchingAnalyticsLogs({
+    String? cooperativeId,
+    int page = 1,
+  }) async {
+    try {
+      final res = await _api.getMatchingAnalytics(
+        cooperativeId: cooperativeId,
+        page: page,
+        rangeType: _selectedDateRange,
+      );
+      if (res != null) {
+        _matchingAnalytics = res;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchMatchingAnalyticsLogs error: $e');
+    }
+  }
+
+  Future<void> fetchDataQualityAudit() async {
+    try {
+      final res = await _api.getDataQualityReport();
+      if (res != null) {
+        _dataQualityReport = res;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchDataQualityAudit error: $e');
+    }
   }
 }

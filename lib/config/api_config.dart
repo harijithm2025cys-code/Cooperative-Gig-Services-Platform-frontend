@@ -104,5 +104,20 @@ class ApiConfig {
   static String adminResolveDispute(String complaintId) => '/admin/disputes/$complaintId/resolve';
   static const String adminAuditLogs = '/admin/audit-logs';
   static const String adminAnalytics = '/admin/analytics';
+
+  // Phase 7 Endpoints — Real Analytics & ML Foundation
+  static const String analyticsPlatform = '/analytics/platform';
+  static String analyticsAssociation(String coopId) => '/analytics/association/$coopId';
+  static const String analyticsServices = '/analytics/services';
+  static const String analyticsWorkers = '/analytics/workers';
+  static const String analyticsDemand = '/analytics/demand';
+  static const String analyticsMatching = '/analytics/matching';
+  static const String analyticsDataQuality = '/analytics/data-quality';
+  static String analyticsExportCsv(String type, {String? coopId}) {
+    final base = '/analytics/export/csv?type=$type';
+    return coopId != null ? '$base&cooperative_id=$coopId' : base;
+  }
+  static const String mlWorkerRanking = '/analytics/ml-dataset/worker-ranking';
+  static const String mlDemandForecast = '/analytics/ml-dataset/demand-forecast';
 }
 

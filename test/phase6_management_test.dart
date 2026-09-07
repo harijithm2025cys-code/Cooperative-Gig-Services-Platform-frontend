@@ -17,6 +17,16 @@ class MockAdminProvider extends AdminProvider {
   Future<void> fetchSuperAdminData() async {
     // Immediate completion for widget test without network call
   }
+
+  @override
+  Future<void> fetchPhase7Analytics({
+    String? cooperativeId,
+    bool isSuperAdmin = false,
+    String? startDate,
+    String? endDate,
+  }) async {
+    // Immediate completion for widget test without network call
+  }
 }
 
 void main() {

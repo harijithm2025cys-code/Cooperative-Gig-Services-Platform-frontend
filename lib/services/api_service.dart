@@ -2338,6 +2338,153 @@ class ApiService {
     }
     return null;
   }
+
+  // ---------------------------------------------------------------------------
+  // Phase 7 Analytics & ML Foundation API Methods
+  // ---------------------------------------------------------------------------
+
+  Future<Map<String, dynamic>?> getPlatformKpis({
+    String rangeType = 'last_30_days',
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final q = <String, dynamic>{'range_type': rangeType};
+      if (startDate != null) q['start_date'] = startDate;
+      if (endDate != null) q['end_date'] = endDate;
+
+      final res = await _dio.get(ApiConfig.analyticsPlatform, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getPlatformKpis error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> getAssociationScopedAnalytics({
+    required String cooperativeId,
+    String rangeType = 'last_30_days',
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final q = <String, dynamic>{'range_type': rangeType};
+      if (startDate != null) q['start_date'] = startDate;
+      if (endDate != null) q['end_date'] = endDate;
+
+      final res = await _dio.get(ApiConfig.analyticsAssociation(cooperativeId), queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAssociationScopedAnalytics error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> getServiceDemandAnalytics({
+    String? cooperativeId,
+    String rangeType = 'last_30_days',
+    String? startDate,
+    String? endDate,
+  }) async {
+    try {
+      final q = <String, dynamic>{'range_type': rangeType};
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+      if (startDate != null) q['start_date'] = startDate;
+      if (endDate != null) q['end_date'] = endDate;
+
+      final res = await _dio.get(ApiConfig.analyticsServices, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getServiceDemandAnalytics error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> getWorkerUtilizationAnalytics({
+    String? cooperativeId,
+    String? search,
+    int page = 1,
+    int limit = 20,
+    String rangeType = 'last_30_days',
+  }) async {
+    try {
+      final q = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+        'range_type': rangeType,
+      };
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+      if (search != null && search.isNotEmpty) q['search'] = search;
+
+      final res = await _dio.get(ApiConfig.analyticsWorkers, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getWorkerUtilizationAnalytics error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> getGeographicDemandAnalytics({
+    String? cooperativeId,
+    String rangeType = 'last_30_days',
+  }) async {
+    try {
+      final q = <String, dynamic>{'range_type': rangeType};
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+
+      final res = await _dio.get(ApiConfig.analyticsDemand, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getGeographicDemandAnalytics error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> getMatchingAnalytics({
+    String? cooperativeId,
+    int page = 1,
+    int limit = 50,
+    String rangeType = 'last_30_days',
+  }) async {
+    try {
+      final q = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+        'range_type': rangeType,
+      };
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+
+      final res = await _dio.get(ApiConfig.analyticsMatching, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getMatchingAnalytics error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> getDataQualityReport() async {
+    try {
+      final res = await _dio.get(ApiConfig.analyticsDataQuality);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getDataQualityReport error: $e');
+    }
+    return null;
+  }
 }
 
 
