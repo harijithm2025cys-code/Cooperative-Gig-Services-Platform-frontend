@@ -12,6 +12,8 @@ enum BookingStatus {
   paymentReleased,
   inProgress,
   verifiedCheckout,
+  customerConfirmationPending,
+  customerConfirmed,
   completed,
   cancelled;
 
@@ -37,6 +39,10 @@ enum BookingStatus {
         return 'in_progress';
       case BookingStatus.verifiedCheckout:
         return 'verified_checkout';
+      case BookingStatus.customerConfirmationPending:
+        return 'customer_confirmation_pending';
+      case BookingStatus.customerConfirmed:
+        return 'customer_confirmed';
       case BookingStatus.completed:
         return 'completed';
       case BookingStatus.cancelled:
@@ -66,6 +72,10 @@ enum BookingStatus {
         return 'Service In Progress';
       case BookingStatus.verifiedCheckout:
         return 'Check-Out Verified';
+      case BookingStatus.customerConfirmationPending:
+        return 'Awaiting Customer Inspection';
+      case BookingStatus.customerConfirmed:
+        return 'Customer Accepted';
       case BookingStatus.completed:
         return 'Completed';
       case BookingStatus.cancelled:
@@ -88,6 +98,8 @@ enum BookingStatus {
       case BookingStatus.inProgress:
         return 3;
       case BookingStatus.verifiedCheckout:
+      case BookingStatus.customerConfirmationPending:
+      case BookingStatus.customerConfirmed:
       case BookingStatus.completed:
         return 4;
       case BookingStatus.cancelled:
@@ -129,6 +141,11 @@ enum BookingStatus {
       case 'verified_checkout':
       case 'checkout_verified':
         return BookingStatus.verifiedCheckout;
+      case 'customer_confirmation_pending':
+      case 'confirmation_pending':
+        return BookingStatus.customerConfirmationPending;
+      case 'customer_confirmed':
+        return BookingStatus.customerConfirmed;
       case 'completed':
       case 'done':
       case 'checked_out':
@@ -145,7 +162,7 @@ enum BookingStatus {
 
 enum VerificationMethod { gpsProximity, otpMatch, qrScan, manual }
 
-enum PaymentStatus { pending, heldInEscrow, released, refunded, failed }
+enum PaymentStatus { pending, heldInEscrow, released, captured, refunded, failed }
 
 class Booking {
   final String id;
@@ -194,6 +211,9 @@ class Booking {
   final bool isEmergency;
   final String? cancellationReason;
   final String? etaFormatted;
+  final String settlementStatus;
+  final String? invoiceId;
+  final String? paymentId;
 
   const Booking({
     required this.id,
@@ -239,6 +259,9 @@ class Booking {
     this.isEmergency = false,
     this.cancellationReason,
     this.etaFormatted,
+    this.settlementStatus = 'PENDING',
+    this.invoiceId,
+    this.paymentId,
   });
 
   bool get bothVerifiedCheckin => householdVerifiedCheckin && workerVerifiedCheckin;
@@ -269,6 +292,9 @@ class Booking {
     bool? isEmergency,
     String? cancellationReason,
     String? etaFormatted,
+    String? settlementStatus,
+    String? invoiceId,
+    String? paymentId,
   }) {
     return Booking(
       id: id,
@@ -314,6 +340,9 @@ class Booking {
       isEmergency: isEmergency ?? this.isEmergency,
       cancellationReason: cancellationReason ?? this.cancellationReason,
       etaFormatted: etaFormatted ?? this.etaFormatted,
+      settlementStatus: settlementStatus ?? this.settlementStatus,
+      invoiceId: invoiceId ?? this.invoiceId,
+      paymentId: paymentId ?? this.paymentId,
     );
   }
 
@@ -357,6 +386,9 @@ class Booking {
     'is_emergency': isEmergency,
     'cancellation_reason': cancellationReason,
     'eta_formatted': etaFormatted,
+    'settlement_status': settlementStatus,
+    'invoice_id': invoiceId,
+    'payment_id': paymentId,
   };
 
   factory Booking.fromJson(Map<String, dynamic> json) {
@@ -366,6 +398,8 @@ class Booking {
       pStatus = PaymentStatus.released;
     } else if (ps == 'held_in_escrow' || ps == 'held') {
       pStatus = PaymentStatus.heldInEscrow;
+    } else if (ps == 'captured') {
+      pStatus = PaymentStatus.captured;
     } else if (ps == 'refunded') {
       pStatus = PaymentStatus.refunded;
     } else if (ps == 'failed') {
@@ -427,6 +461,9 @@ class Booking {
       isEmergency: json['is_emergency'] == true || json['is_emergency']?.toString().toLowerCase() == 'true',
       cancellationReason: json['cancellation_reason']?.toString(),
       etaFormatted: json['eta_formatted']?.toString(),
+      settlementStatus: json['settlement_status']?.toString() ?? 'PENDING',
+      invoiceId: json['invoice_id']?.toString(),
+      paymentId: json['payment_id']?.toString(),
     );
   }
 }

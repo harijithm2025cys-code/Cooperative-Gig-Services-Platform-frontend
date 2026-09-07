@@ -117,41 +117,73 @@ class _WorkerActiveJobScreenState extends State<WorkerActiveJobScreen> {
     }
   }
 
-  Future<void> _handleVerifyCheckOut() async {
-    final otp = _otpController.text.trim();
-    if (otp.isEmpty) {
+
+  Future<void> _handleCompleteServiceRequest() async {
+    setState(() => _isProcessing = true);
+    final ok = await ApiService().completeWorkerService(
+      _job.workerId,
+      _job.id,
+    );
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+    if (ok) {
+      final updated = _job.copyWith(
+        status: BookingStatus.customerConfirmationPending,
+      );
+      setState(() => _job = updated);
+      Provider.of<BookingProvider>(context, listen: false).setActiveBooking(updated);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the check-out OTP to confirm completion')),
+        const SnackBar(
+          content: Text('Work marked complete! Customer has received their 6-digit confirmation OTP.'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleVerifyCustomerOtp() async {
+    final otp = _otpController.text.trim();
+    if (otp.length != 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter the full 6-digit OTP from customer')),
       );
       return;
     }
     setState(() => _isProcessing = true);
-    final bookingProv = Provider.of<BookingProvider>(context, listen: false);
-    final success = await bookingProv.verifyCheckOut(
+    final res = await ApiService().verifyWorkerCompletionOtp(
+      workerId: _job.workerId,
       bookingId: _job.id,
-      verifierRole: 'worker',
-      method: 'otp_match',
       otpCode: otp,
     );
     if (!mounted) return;
     setState(() => _isProcessing = false);
-    if (success) {
-      final updated = Provider.of<BookingProvider>(context, listen: false).currentActiveBooking ?? _job;
+    _otpController.clear();
+    if (res['status'] == 'success') {
+      final updated = _job.copyWith(
+        status: BookingStatus.completed,
+        settlementStatus: 'ELIGIBLE',
+        invoiceId: res['invoice_id'] as String?,
+        workerVerifiedCheckout: true,
+        householdVerifiedCheckout: true,
+        checkOutTime: DateTime.now(),
+      );
       setState(() => _job = updated);
-      try {
-        LocationService().stopLiveTracking();
-      } catch (_) {}
+      Provider.of<BookingProvider>(context, listen: false).markCustomerConfirmed(
+        bookingId: _job.id,
+        invoiceId: res['invoice_id'] as String?,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_job.bothVerifiedCheckout
-              ? 'Dual check-out verified! Gig completed. Payout queued.'
-              : 'Your check-out recorded. Waiting for household to also confirm.'),
+          content: Text('✓ Completion OTP verified! Settlement is ELIGIBLE. Invoice ${res['invoice_id'] ?? ''} generated.'),
           backgroundColor: AppColors.statusCompleted,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Check-out failed. OTP mismatch.')),
+        SnackBar(
+          content: Text(res['detail'] ?? res['message'] ?? 'OTP verification failed. Please re-check with customer.'),
+          backgroundColor: AppColors.statusCancelled,
+        ),
       );
     }
   }
@@ -443,6 +475,7 @@ class _WorkerActiveJobScreenState extends State<WorkerActiveJobScreen> {
                     icon: const Icon(Icons.my_location_rounded, size: 18),
                     label: const Text('Transmit Live GPS Location to Customer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
                       final pos = await LocationService().getCurrentPosition();
                       if (pos != null) {
                         await ApiService().pushWorkerAssignmentLocation(
@@ -453,7 +486,7 @@ class _WorkerActiveJobScreenState extends State<WorkerActiveJobScreen> {
                           workerId: _job.workerId,
                         );
                         if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
+                          messenger.showSnackBar(
                             const SnackBar(
                               content: Text('✓ Live GPS transmitted. Customer tracking map and ETA updated.'),
                               backgroundColor: AppColors.primary,
@@ -517,9 +550,10 @@ class _WorkerActiveJobScreenState extends State<WorkerActiveJobScreen> {
                     icon: const Icon(Icons.build_rounded),
                     label: const Text('Customer Paid - Begin Service Work', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
                       await _setStatus(BookingStatus.inProgress);
                       if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        messenger.showSnackBar(
                           const SnackBar(content: Text('Service timer started.'), backgroundColor: AppColors.statusInProgress),
                         );
                       }
@@ -535,14 +569,57 @@ class _WorkerActiveJobScreenState extends State<WorkerActiveJobScreen> {
                     icon: const Icon(Icons.task_alt_rounded),
                     label: _isProcessing
                         ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : const Text('Service Done - Verify Check-Out (OTP)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    onPressed: _isProcessing
-                        ? null
-                        : () => _showOtpDialog(
-                              title: 'Worker Check-Out Verification',
-                              hint: 'Both parties must enter the same check-out OTP to release final payout.',
-                              onConfirm: _handleVerifyCheckOut,
-                            ),
+                        : const Text('Mark Service Completed (Generate OTP)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    onPressed: _isProcessing ? null : _handleCompleteServiceRequest,
+                  ),
+                ),
+              ] else if (_job.status == BookingStatus.customerConfirmationPending) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.hourglass_top_rounded, color: AppColors.statusCompleted),
+                          SizedBox(width: 8),
+                          Text('Service Finished • Customer Inspecting Work',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.statusCompleted)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'The customer has received their 6-digit Acceptance OTP. Once they inspect and accept the completed work, ask for the code and enter it below to confirm completion and unlock payout eligibility.',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.statusCompleted,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          icon: const Icon(Icons.pin_rounded, size: 20),
+                          label: const Text('Enter Customer Confirmation OTP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                          onPressed: _isProcessing
+                              ? null
+                              : () => _showOtpDialog(
+                                    title: 'Customer Acceptance OTP',
+                                    hint: 'Enter the 6-digit OTP provided by customer after inspection.',
+                                    onConfirm: _handleVerifyCustomerOtp,
+                                  ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ] else if (_job.status == BookingStatus.verifiedCheckout && !_job.bothVerifiedCheckout) ...[

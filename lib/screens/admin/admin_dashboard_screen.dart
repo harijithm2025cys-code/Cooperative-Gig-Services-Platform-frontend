@@ -116,6 +116,142 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  void _openComplaintsReviewModal() {
+    final List<Map<String, dynamic>> mockDisputes = [
+      {
+        'id': 'cmp_01',
+        'booking_id': 'BK-1082',
+        'complainant': 'Ananya Sharma',
+        'category': 'Service incomplete',
+        'description': 'Technician did not check gas pressure after coil cleaning.',
+        'status': 'OPEN',
+        'settlement': 'DISPUTED (₹420 held)',
+      },
+      {
+        'id': 'cmp_02',
+        'booking_id': 'BK-1055',
+        'complainant': 'Vikram Mehta',
+        'category': 'Poor quality',
+        'description': 'Cooling temperature did not drop below 24C after visit.',
+        'status': 'OPEN',
+        'settlement': 'DISPUTED (₹650 held)',
+      },
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setMState) => Container(
+          height: MediaQuery.of(ctx).size.height * 0.75,
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.gavel_rounded, color: AppColors.statusCancelled, size: 24),
+                      SizedBox(width: 8),
+                      Text('Dispute & Complaint Tribunal', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
+                    ],
+                  ),
+                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text('Cooperative Association Head Authority • Freeze & Settlement Review',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const Divider(height: 24),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: mockDisputes.length,
+                  itemBuilder: (context, idx) {
+                    final d = mockDisputes[idx];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: App3D.card3D(borderRadius: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEE2E2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(d['category'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF991B1B))),
+                              ),
+                              Text(d['settlement'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5, color: AppColors.statusCancelled)),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Text('Order #${d['booking_id']} • Customer: ${d['complainant']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                          const SizedBox(height: 4),
+                          Text('"${d['description']}"', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary, fontStyle: FontStyle.italic)),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.statusCompleted,
+                                    side: const BorderSide(color: AppColors.statusCompleted),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  icon: const Icon(Icons.check_circle_outline, size: 16),
+                                  label: const Text('Resolve & Release Payout', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                  onPressed: () {
+                                    setMState(() => mockDisputes.removeAt(idx));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Dispute resolved. Settlement status updated to ELIGIBLE.'), backgroundColor: AppColors.statusCompleted),
+                                    );
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.statusCancelled,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  icon: const Icon(Icons.currency_rupee, size: 16),
+                                  label: const Text('Approve Refund', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                  onPressed: () {
+                                    setMState(() => mockDisputes.removeAt(idx));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Refund approved via Super Admin Razorpay gateway!'), backgroundColor: AppColors.primaryDark),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showAddCooperativeWorkerDialog() {
     final nameCtrl = TextEditingController();
     final skillCtrl = TextEditingController(text: 'Electrical / AC Technician');
@@ -869,6 +1005,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             title: 'NCD Compliance & ISO 9001:2024',
             subtitle: 'Valid till 31 Dec 2027 • Status: In Good Standing',
             iconColor: AppColors.statusCompleted,
+          ),
+          _buildAdminItem(
+            icon: Icons.gavel_rounded,
+            title: 'Dispute & Complaint Tribunal',
+            subtitle: 'Review customer complaints, freeze/release settlements',
+            iconColor: AppColors.statusCancelled,
+            onTap: _openComplaintsReviewModal,
           ),
           _buildAdminItem(
             icon: Icons.person_outline,

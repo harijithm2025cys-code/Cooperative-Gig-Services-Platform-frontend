@@ -57,5 +57,22 @@ class ApiConfig {
   static const String notificationsUnreadCount = '/notifications/unread-count';
   static String notificationMarkRead(String id) => '/notifications/$id/read';
   static const String notificationsMarkAllRead = '/notifications/mark-all-read';
+
+  // Phase 5 Endpoints
+  static const String createPaymentOrder = '/payments/create-order';
+  static const String verifyPayment = '/payments/verify';
+  static String paymentDetail(String id) => '/payments/$id';
+  static String refundPayment(String id) => '/payments/$id/refund';
+
+  static String invoiceByBooking(String bookingId) => '/invoices/booking/$bookingId';
+  static String invoiceDetail(String id) => '/invoices/$id';
+  static String invoiceDownload(String id) => '/invoices/$id/download';
+
+  static String bookingCompletionOtp(String bookingId) => '/bookings/$bookingId/completion-otp';
+  static String workerVerifyCompletionOtp(String workerId) => '/workers/$workerId/verify-completion-otp';
+
+  static const String complaints = '/complaints/';
+  static String cooperativeComplaints(String coopId) => '/complaints/cooperative/$coopId';
+  static String resolveComplaint(String id) => '/complaints/$id/resolve';
 }
 

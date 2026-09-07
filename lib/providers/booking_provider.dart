@@ -41,6 +41,8 @@ class BookingProvider with ChangeNotifier {
             b.status == BookingStatus.paymentPending ||
             b.status == BookingStatus.paymentReleased ||
             b.status == BookingStatus.inProgress ||
+            b.status == BookingStatus.customerConfirmationPending ||
+            b.status == BookingStatus.customerConfirmed ||
             b.status == BookingStatus.verifiedCheckout,
       );
     } catch (_) {
@@ -60,6 +62,8 @@ class BookingProvider with ChangeNotifier {
             b.status == BookingStatus.paymentPending ||
             b.status == BookingStatus.paymentReleased ||
             b.status == BookingStatus.inProgress ||
+            b.status == BookingStatus.customerConfirmationPending ||
+            b.status == BookingStatus.customerConfirmed ||
             b.status == BookingStatus.verifiedCheckout,
       );
     } catch (_) {
@@ -451,5 +455,49 @@ class BookingProvider with ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  Future<void> markPaymentCaptured({
+    required String bookingId,
+    required String paymentId,
+    String settlementStatus = 'PENDING',
+  }) async {
+    final idx = _householdBookings.indexWhere((b) => b.id == bookingId);
+    if (idx != -1) {
+      _householdBookings[idx] = _householdBookings[idx].copyWith(
+        paymentStatus: PaymentStatus.captured,
+        paymentId: paymentId,
+        settlementStatus: settlementStatus,
+      );
+      if (_currentActiveBooking?.id == bookingId) {
+        _currentActiveBooking = _householdBookings[idx];
+      }
+      notifyListeners();
+    }
+  }
+
+  Future<void> markCustomerConfirmed({
+    required String bookingId,
+    String? invoiceId,
+    String settlementStatus = 'ELIGIBLE',
+  }) async {
+    final idx = _householdBookings.indexWhere((b) => b.id == bookingId);
+    final wIdx = _workerBookings.indexWhere((b) => b.id == bookingId);
+    final targets = [if (idx != -1) idx, if (wIdx != -1) wIdx];
+    for (final i in targets) {
+      final list = i == idx ? _householdBookings : _workerBookings;
+      list[i] = list[i].copyWith(
+        status: BookingStatus.customerConfirmed,
+        settlementStatus: settlementStatus,
+        invoiceId: invoiceId ?? list[i].invoiceId,
+        householdVerifiedCheckout: true,
+        workerVerifiedCheckout: true,
+        checkOutTime: DateTime.now(),
+      );
+      if (_currentActiveBooking?.id == bookingId) {
+        _currentActiveBooking = list[i];
+      }
+    }
+    notifyListeners();
   }
 }

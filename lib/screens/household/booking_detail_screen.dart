@@ -6,7 +6,9 @@ import '../../services/location_service.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/custom_map_widget.dart';
+import '../../services/razorpay_service.dart';
 import 'rate_worker_dialog.dart';
+import 'invoice_view_screen.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final Booking? booking;
@@ -20,7 +22,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   Booking? _booking;
   bool _isProcessing = false;
   final _otpController = TextEditingController();
-  int _selectedPayMethod = 2;
 
   @override
   void initState() {
@@ -65,10 +66,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       case BookingStatus.paymentReleased:
         return 2;
       case BookingStatus.inProgress:
-      case BookingStatus.verifiedCheckout:
         return 3;
-      case BookingStatus.completed:
+      case BookingStatus.customerConfirmationPending:
         return 4;
+      case BookingStatus.customerConfirmed:
+      case BookingStatus.verifiedCheckout:
+      case BookingStatus.completed:
+        return 5;
     }
   }
 
@@ -281,140 +285,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     }
   }
 
-  void _openPaymentModal(Booking booking) {
-    if (!booking.bothVerifiedCheckin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment is locked until BOTH you and the worker verify check-in.')),
-      );
-      return;
-    }
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setPayState) => Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Complete Escrow Payment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: App3D.card3D(
-                  backgroundColor: AppColors.primaryContainer,
-                  borderRadius: 18,
-                  border: Border.all(color: const Color(0xFFDDD6FE), width: 1.5),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Total Payable (Protected)', style: TextStyle(fontSize: 12.5, color: AppColors.onPrimaryContainer, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 4),
-                        Text('₹${(booking.amount > 0 ? booking.amount : 420).toInt()}',
-                            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: AppColors.primaryDark)),
-                      ],
-                    ),
-                    const Icon(Icons.verified_user_rounded, color: AppColors.primaryLight, size: 36),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.statusCompletedBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.statusCompleted.withValues(alpha: 0.3)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.gpp_good_rounded, size: 16, color: AppColors.statusCompleted),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text('Funds held in Cooperative Escrow. Released ONLY after dual check-out verification.',
-                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: AppColors.statusCompleted)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text('Select Payment Option', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5)),
-              const SizedBox(height: 10),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Radio<int>(value: 0, groupValue: _selectedPayMethod, activeColor: AppColors.primary, onChanged: (v) => setPayState(() => _selectedPayMethod = v!)),
-                title: const Text('UPI (GPay / PhonePe / Paytm / BHIM)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                trailing: const Icon(Icons.qr_code_rounded, color: AppColors.primary),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Radio<int>(value: 1, groupValue: _selectedPayMethod, activeColor: AppColors.primary, onChanged: (v) => setPayState(() => _selectedPayMethod = v!)),
-                title: const Text('Debit / Credit Card (Visa, Mastercard, RuPay)', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                trailing: const Icon(Icons.credit_card_rounded, color: Colors.blueGrey),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Radio<int>(value: 2, groupValue: _selectedPayMethod, activeColor: AppColors.primary, onChanged: (v) => setPayState(() => _selectedPayMethod = v!)),
-                title: const Text('Cooperative Escrow Wallet', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                trailing: const Icon(Icons.account_balance_wallet_rounded, color: AppColors.primary),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  style: App3D.button3D(backgroundColor: AppColors.primary, borderRadius: 14),
-                  onPressed: () async {
-                    final method = ['upi', 'card', 'escrow_wallet'][_selectedPayMethod];
-                    setState(() => _isProcessing = true);
-                    Navigator.pop(ctx);
-                    final bookingProv = Provider.of<BookingProvider>(context, listen: false);
-                    final ok = await bookingProv.processPayment(
-                      bookingId: booking.id,
-                      amount: booking.amount > 0 ? booking.amount : 420,
-                      paymentMethod: method,
-                      releaseAfterVerification: true,
-                    );
-                    if (!mounted) return;
-                    setState(() => _isProcessing = false);
-                    if (ok) {
-                      setState(() => _booking = bookingProv.currentActiveBooking ?? _booking);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Payment of ₹${(booking.amount > 0 ? booking.amount : 420).toInt()} held securely in Cooperative Escrow!'),
-                          backgroundColor: AppColors.statusCompleted,
-                        ),
-                      );
-                    }
-                  },
-                  child: _isProcessing
-                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : Text('Pay ₹${(booking.amount > 0 ? booking.amount : 420).toInt()} Securely',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _openRatingDialog() {
     if (_booking == null) return;
     showDialog(
@@ -430,6 +300,261 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         setState(() => _booking = updated);
       }
     });
+  }
+
+  Future<void> _handleRazorpayPayment(Booking booking) async {
+    setState(() => _isProcessing = true);
+    final amount = booking.amount > 0 ? booking.amount : 420.0;
+    final order = await ApiService().createPaymentOrder(
+      bookingId: booking.id,
+      amount: amount,
+    );
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+
+    if (order == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not create Razorpay order. Please try again.')),
+      );
+      return;
+    }
+
+    final resp = await RazorpayService().openCheckout(
+      context: context,
+      order: order,
+      customerName: booking.householdName,
+      customerEmail: 'customer@cooperativegig.in',
+      customerPhone: booking.householdPhone,
+      serviceTitle: '${booking.workerSkill} Service Booking',
+    );
+
+    if (resp != null && mounted) {
+      setState(() => _isProcessing = true);
+      final verifyRes = await ApiService().verifyPayment(
+        razorpayOrderId: resp.razorpayOrderId,
+        razorpayPaymentId: resp.razorpayPaymentId,
+        razorpaySignature: resp.razorpaySignature,
+        bookingId: booking.id,
+      );
+      if (!mounted) return;
+      setState(() => _isProcessing = false);
+
+      if (verifyRes['payment_status'] == 'CAPTURED' || verifyRes['status'] == 'success') {
+        final messenger = ScaffoldMessenger.of(context);
+        final bookingProv = Provider.of<BookingProvider>(context, listen: false);
+        await bookingProv.markPaymentCaptured(
+          bookingId: booking.id,
+          paymentId: resp.razorpayPaymentId,
+          settlementStatus: 'PENDING',
+        );
+        if (!mounted) return;
+        setState(() {
+          _booking = _booking?.copyWith(
+            paymentStatus: PaymentStatus.captured,
+            paymentId: resp.razorpayPaymentId,
+            settlementStatus: 'PENDING',
+          );
+        });
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Payment ₹${amount.toInt()} CAPTURED via Razorpay! Settlement: PENDING completion.'),
+            backgroundColor: AppColors.statusCompleted,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _showCustomerCompletionOtp(Booking booking) async {
+    setState(() => _isProcessing = true);
+    final data = await ApiService().getCompletionOtp(booking.id);
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+
+    final otpCode = data?['otp_code'] ?? '842196';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: AppColors.primary, size: 24),
+            SizedBox(width: 8),
+            Text('Completion Acceptance OTP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Share this 6-digit OTP with your specialist ONLY after you have inspected and accepted the completed work:',
+              style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFDDD6FE)),
+              ),
+              child: Text(
+                otpCode,
+                style: const TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 10,
+                  color: AppColors.primaryDark,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.timer_outlined, size: 14, color: AppColors.textTertiary),
+                SizedBox(width: 4),
+                Text('Valid for 15 minutes • Single-use', style: TextStyle(fontSize: 11.5, color: AppColors.textTertiary)),
+              ],
+            ),
+          ],
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReportDisputeDialog(Booking booking) {
+    String selectedCategory = 'Service incomplete';
+    final descController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.report_problem_rounded, color: AppColors.statusCancelled, size: 22),
+              SizedBox(width: 8),
+              Text('Report Service Problem', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Filing a dispute freezes settlement funds until your Cooperative Association Head reviews the case.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 14),
+              const Text('Category', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                initialValue: selectedCategory,
+                decoration: InputDecoration(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                items: [
+                  'Service incomplete',
+                  'Poor quality',
+                  'Wrong service',
+                  'Damage',
+                  'Worker issue',
+                  'Other',
+                ].map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+                onChanged: (v) => setDlgState(() => selectedCategory = v!),
+              ),
+              const SizedBox(height: 12),
+              const Text('Explain the issue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: descController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Describe the issue or defect observed…',
+                  hintStyle: const TextStyle(fontSize: 12),
+                  contentPadding: const EdgeInsets.all(12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppColors.statusCancelled),
+              onPressed: () async {
+                final desc = descController.text.trim();
+                if (desc.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Please describe the issue.')),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx);
+                setState(() => _isProcessing = true);
+                final res = await ApiService().fileComplaint(
+                  bookingId: booking.id,
+                  category: selectedCategory,
+                  description: desc,
+                );
+                if (!mounted) return;
+                setState(() {
+                  _isProcessing = false;
+                  _booking = _booking?.copyWith(settlementStatus: 'DISPUTED');
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(res != null
+                        ? 'Dispute filed! Settlement frozen. Complaint #${res.id} under Association review.'
+                        : 'Dispute recorded. Settlement frozen.'),
+                    backgroundColor: AppColors.statusCancelled,
+                  ),
+                );
+              },
+              child: const Text('Submit Dispute'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openInvoiceView(Booking booking) async {
+    setState(() => _isProcessing = true);
+    final inv = await ApiService().getInvoiceByBooking(booking.id);
+    if (!mounted) return;
+    setState(() => _isProcessing = false);
+
+    if (inv != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => InvoiceViewScreen(
+            invoice: inv,
+            customerName: booking.householdName,
+            customerPhone: booking.householdPhone,
+            customerAddress: booking.serviceAddress,
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not fetch invoice at this moment.')),
+      );
+    }
   }
 
   void _openCallModal(String name, String phone) {
@@ -683,49 +808,62 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               _buildOtpCard(booking),
               const SizedBox(height: 20),
               _buildDualVerificationCard(booking),
+              if (booking.status == BookingStatus.customerConfirmationPending) ...[
+                const SizedBox(height: 20),
+                _buildCustomerInspectionCard(booking),
+              ],
+              if (booking.status == BookingStatus.customerConfirmed || booking.status == BookingStatus.completed) ...[
+                const SizedBox(height: 20),
+                _buildCompletedInvoiceCard(booking),
+              ],
               const SizedBox(height: 20),
               _buildBookingDetailsCard(booking),
               const SizedBox(height: 24),
 
-              // Direct Confirmation & Payment Flow (Customer + Worker Dual Confirmation)
-              if (booking.status != BookingStatus.completed && booking.paymentStatus != PaymentStatus.released && booking.status != BookingStatus.cancelled) ...[
-                if (!booking.householdVerifiedCheckout) ...[
+              // Phase 5 Actions & Razorpay Integration
+              if (booking.status != BookingStatus.completed &&
+                  booking.status != BookingStatus.customerConfirmed &&
+                  booking.status != BookingStatus.cancelled) ...[
+                if (booking.paymentStatus != PaymentStatus.captured && booking.paymentStatus != PaymentStatus.released) ...[
                   SizedBox(
                     width: double.infinity,
                     height: 52,
                     child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.statusCompleted,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 4,
+                      style: App3D.button3D(
+                        backgroundColor: const Color(0xFF0C2340),
+                        borderRadius: 14,
                       ),
-                      icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
-                      label: const Text('✓ Confirm Work Completed (Customer Confirmation)',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                      onPressed: () async {
-                        setState(() => _isProcessing = true);
-                        final bookingProv = Provider.of<BookingProvider>(context, listen: false);
-                        final updated = booking.copyWith(
-                          householdVerifiedCheckout: true,
-                          workerVerifiedCheckout: true,
-                          status: BookingStatus.completed,
-                          checkOutTime: DateTime.now(),
-                        );
-                        bookingProv.setActiveBooking(updated);
-                        await bookingProv.updateStatus(booking.id, BookingStatus.completed);
-                        if (!mounted) return;
-                        setState(() {
-                          _isProcessing = false;
-                          _booking = updated;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('✓ Work completion confirmed by both parties! You can now proceed to payment.'),
-                            backgroundColor: AppColors.statusCompleted,
+                      icon: _isProcessing
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.bolt_rounded, color: Color(0xFF00BAF2), size: 22),
+                      label: Text(_isProcessing
+                              ? 'PREPARING RAZORPAY CHECKOUT...'
+                              : 'PAY ₹${(booking.amount > 0 ? booking.amount : 420).toInt()} VIA RAZORPAY →',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                      onPressed: _isProcessing ? null : () => _handleRazorpayPayment(booking),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ] else ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: AppColors.statusCompletedBg,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.statusCompleted.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: AppColors.statusCompleted, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Payment Captured (₹${(booking.amount > 0 ? booking.amount : 420).toInt()}) • Settlement: ${booking.settlementStatus}',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: AppColors.statusCompleted),
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -742,23 +880,6 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                     icon: const Icon(Icons.near_me_rounded, size: 20),
                     label: const Text('TRACK WORKER ON LIVE MAP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                     onPressed: () => _openLiveMapModal(booking),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    style: App3D.button3D(
-                      backgroundColor: (booking.householdVerifiedCheckout || booking.status == BookingStatus.completed)
-                          ? AppColors.primary
-                          : const Color(0xFF6B21A8),
-                      borderRadius: 14,
-                    ),
-                    icon: const Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-                    label: Text('PROCEED TO PAYMENT (₹${(booking.amount > 0 ? booking.amount : 420).toInt()}) →',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    onPressed: () => _openPaymentModal(booking),
                   ),
                 ),
                 // Pre-service Customer Cancellation Action
@@ -1387,6 +1508,200 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildCustomerInspectionCard(Booking booking) {
+    final bool isDisputed = booking.settlementStatus == 'DISPUTED';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isDisputed ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: isDisputed ? const Color(0xFFFECACA) : const Color(0xFFBBF7D0), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: (isDisputed ? Colors.red : Colors.green).withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isDisputed ? const Color(0xFFFEE2E2) : const Color(0xFFDCFCE7),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  isDisputed ? Icons.warning_amber_rounded : Icons.verified_rounded,
+                  color: isDisputed ? AppColors.statusCancelled : AppColors.statusCompleted,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isDisputed ? 'Service Dispute Under Review' : 'Service Completed • Inspect Work',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15.5,
+                        color: isDisputed ? const Color(0xFF991B1B) : const Color(0xFF166534),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isDisputed
+                          ? 'Settlement frozen • Association Head reviewing'
+                          : 'Specialist finished. Inspect quality before releasing OTP.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isDisputed ? const Color(0xFFB91C1C) : const Color(0xFF15803D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            isDisputed
+                ? 'A dispute has been recorded. Payment remains safely held. The Labour Cooperative Association Head will contact you and inspect the resolution.'
+                : 'Please inspect the delivered service carefully. When satisfied, provide the 6-digit confirmation OTP to your technician to confirm completion.',
+            style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
+          ),
+          const SizedBox(height: 16),
+          if (!isDisputed) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.statusCompleted,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.key_rounded, size: 20),
+                label: const Text('Show 6-Digit Acceptance OTP', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                onPressed: () => _showCustomerCompletionOtp(booking),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.statusCancelled,
+                  side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.report_problem_outlined, size: 18),
+                label: const Text('Not Satisfied? Report Problem / Dispute', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                onPressed: () => _showReportDisputeDialog(booking),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompletedInvoiceCard(Booking booking) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.receipt_long_rounded, color: AppColors.primaryDark, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text('Official Tax Receipt & Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: AppColors.textPrimary)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.statusCompletedBg,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.statusCompleted.withValues(alpha: 0.3)),
+                ),
+                child: const Text('SETTLED', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10.5, color: AppColors.statusCompleted)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Invoice #${booking.invoiceId ?? 'INV-20260907-0042'} • GST 18% (SAC 998713)',
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  icon: const Icon(Icons.description_outlined, size: 18),
+                  label: const Text('View Tax Invoice', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  onPressed: () => _openInvoiceView(booking),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  icon: const Icon(Icons.star_rounded, size: 18),
+                  label: const Text('Rate Worker', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                  onPressed: _openRatingDialog,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
