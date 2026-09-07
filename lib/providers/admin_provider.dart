@@ -87,6 +87,36 @@ class AdminProvider with ChangeNotifier {
   Map<String, dynamic>? get dataQualityReport => _dataQualityReport;
 
   // =========================================================================
+  // Phase 8: Real AI / ML Layer State
+  // =========================================================================
+  Map<String, dynamic>? _mlDemandForecast;
+  Map<String, dynamic>? _mlModelStatus;
+  Map<String, dynamic>? _mlModelMetrics;
+  Map<String, dynamic>? _mlDurationPrediction;
+  bool _isMlLoading = false;
+  String? _mlError;
+
+  Map<String, dynamic>? get mlDemandForecast => _mlDemandForecast;
+  Map<String, dynamic>? get mlModelStatus => _mlModelStatus;
+  Map<String, dynamic>? get mlModelMetrics => _mlModelMetrics;
+  Map<String, dynamic>? get mlDurationPrediction => _mlDurationPrediction;
+  bool get isMlLoading => _isMlLoading;
+  String? get mlError => _mlError;
+
+  void setMlDataForTesting({
+    Map<String, dynamic>? demandForecast,
+    Map<String, dynamic>? modelStatus,
+    Map<String, dynamic>? modelMetrics,
+    Map<String, dynamic>? durationPrediction,
+  }) {
+    if (demandForecast != null) _mlDemandForecast = demandForecast;
+    if (modelStatus != null) _mlModelStatus = modelStatus;
+    if (modelMetrics != null) _mlModelMetrics = modelMetrics;
+    if (durationPrediction != null) _mlDurationPrediction = durationPrediction;
+    notifyListeners();
+  }
+
+  // =========================================================================
   // Association Head Data Fetching & Mutations
   // =========================================================================
   Future<void> fetchAssociationData({String? cooperativeId}) async {
@@ -503,5 +533,115 @@ class AdminProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('fetchDataQualityAudit error: $e');
     }
+  }
+
+  // =========================================================================
+  // Phase 8: Machine Learning Intelligence Methods
+  // =========================================================================
+
+  Future<void> loadAllMlData({String? cooperativeId, String district = 'Chennai North'}) async {
+    _isMlLoading = true;
+    _mlError = null;
+    notifyListeners();
+
+    try {
+      final results = await Future.wait([
+        _api.getMlModelStatus(),
+        _api.getMlModelMetrics(),
+        _api.getMlDemandForecast(cooperativeId: cooperativeId, district: district),
+      ]);
+
+      _mlModelStatus = results[0];
+      _mlModelMetrics = results[1];
+      _mlDemandForecast = results[2];
+    } catch (e) {
+      _mlError = 'Failed to load ML intelligence: $e';
+      debugPrint(_mlError);
+    } finally {
+      _isMlLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> fetchMlDemandForecast({String? cooperativeId, String district = 'Chennai North'}) async {
+    try {
+      final res = await _api.getMlDemandForecast(cooperativeId: cooperativeId, district: district);
+      if (res != null) {
+        _mlDemandForecast = res;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchMlDemandForecast error: $e');
+    }
+  }
+
+  Future<void> fetchMlModelStatus() async {
+    try {
+      final res = await _api.getMlModelStatus();
+      if (res != null) {
+        _mlModelStatus = res;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchMlModelStatus error: $e');
+    }
+  }
+
+  Future<void> fetchMlModelMetrics() async {
+    try {
+      final res = await _api.getMlModelMetrics();
+      if (res != null) {
+        _mlModelMetrics = res;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('fetchMlModelMetrics error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> predictServiceDuration({
+    required String serviceName,
+    String? category,
+    bool isEmergency = false,
+    double workerRating = 4.8,
+    int experienceYears = 3,
+    double distanceKm = 3.5,
+    double amount = 350.0,
+  }) async {
+    try {
+      final res = await _api.predictServiceDuration(
+        serviceName: serviceName,
+        category: category,
+        isEmergency: isEmergency,
+        workerRating: workerRating,
+        experienceYears: experienceYears,
+        distanceKm: distanceKm,
+        amount: amount,
+      );
+      _mlDurationPrediction = res;
+      notifyListeners();
+      return res;
+    } catch (e) {
+      debugPrint('predictServiceDuration error: $e');
+      return null;
+    }
+  }
+
+  Future<bool> triggerMlRetraining() async {
+    _isMlLoading = true;
+    notifyListeners();
+    try {
+      final res = await _api.triggerMlRetrain();
+      if (res != null && res['success'] == true) {
+        await loadAllMlData();
+        return true;
+      }
+    } catch (e) {
+      debugPrint('triggerMlRetraining error: $e');
+    } finally {
+      _isMlLoading = false;
+      notifyListeners();
+    }
+    return false;
   }
 }

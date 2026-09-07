@@ -119,5 +119,13 @@ class ApiConfig {
   }
   static const String mlWorkerRanking = '/analytics/ml-dataset/worker-ranking';
   static const String mlDemandForecast = '/analytics/ml-dataset/demand-forecast';
+
+  // Phase 8 Endpoints — Real AI/ML Intelligence & Forecasting
+  static const String mlWorkerRankingInference = '/ml/worker-ranking';
+  static const String mlDurationPrediction = '/ml/duration-prediction';
+  static const String mlDemandForecastEndpoint = '/ml/demand-forecast';
+  static const String mlModelStatus = '/ml/model-status';
+  static const String mlModelMetrics = '/ml/model-metrics';
+  static const String mlRetrain = '/ml/train';
 }
 
