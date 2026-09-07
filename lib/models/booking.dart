@@ -85,23 +85,24 @@ enum BookingStatus {
 
   int get stepIndex {
     switch (this) {
-      case BookingStatus.requested:
+      case BookingStatus.paymentPending:
         return 0;
+      case BookingStatus.requested:
+        return 1;
       case BookingStatus.accepted:
       case BookingStatus.workerEnroute:
       case BookingStatus.arrived:
-        return 1;
       case BookingStatus.verifiedCheckin:
-      case BookingStatus.paymentPending:
-      case BookingStatus.paymentReleased:
         return 2;
       case BookingStatus.inProgress:
         return 3;
-      case BookingStatus.verifiedCheckout:
       case BookingStatus.customerConfirmationPending:
+      case BookingStatus.verifiedCheckout:
+        return 4;
       case BookingStatus.customerConfirmed:
       case BookingStatus.completed:
-        return 4;
+      case BookingStatus.paymentReleased:
+        return 5;
       case BookingStatus.cancelled:
       case BookingStatus.rejected:
         return -1;
@@ -269,6 +270,15 @@ class Booking {
   bool get paymentReleased => paymentStatus == PaymentStatus.released || paymentStatus == PaymentStatus.heldInEscrow;
 
   Booking copyWith({
+    String? workerId,
+    String? workerName,
+    String? workerSkill,
+    String? workerPhone,
+    String? workerCoop,
+    int? requiredWorkerCount,
+    int? assignedWorkerCount,
+    String? allocationStatus,
+    List<BookingAssignment>? assignments,
     BookingStatus? status,
     DateTime? checkInTime,
     DateTime? checkOutTime,
@@ -298,11 +308,11 @@ class Booking {
   }) {
     return Booking(
       id: id,
-      workerId: workerId,
-      workerName: workerName,
-      workerSkill: workerSkill,
-      workerPhone: workerPhone,
-      workerCoop: workerCoop,
+      workerId: workerId ?? this.workerId,
+      workerName: workerName ?? this.workerName,
+      workerSkill: workerSkill ?? this.workerSkill,
+      workerPhone: workerPhone ?? this.workerPhone,
+      workerCoop: workerCoop ?? this.workerCoop,
       householdId: householdId,
       householdName: householdName,
       householdPhone: householdPhone,
@@ -333,10 +343,10 @@ class Booking {
       workerCheckinTime: workerCheckinTime ?? this.workerCheckinTime,
       householdCheckoutTime: householdCheckoutTime ?? this.householdCheckoutTime,
       workerCheckoutTime: workerCheckoutTime ?? this.workerCheckoutTime,
-      requiredWorkerCount: requiredWorkerCount,
-      assignedWorkerCount: assignedWorkerCount,
-      allocationStatus: allocationStatus,
-      assignments: assignments,
+      requiredWorkerCount: requiredWorkerCount ?? this.requiredWorkerCount,
+      assignedWorkerCount: assignedWorkerCount ?? this.assignedWorkerCount,
+      allocationStatus: allocationStatus ?? this.allocationStatus,
+      assignments: assignments ?? this.assignments,
       isEmergency: isEmergency ?? this.isEmergency,
       cancellationReason: cancellationReason ?? this.cancellationReason,
       etaFormatted: etaFormatted ?? this.etaFormatted,

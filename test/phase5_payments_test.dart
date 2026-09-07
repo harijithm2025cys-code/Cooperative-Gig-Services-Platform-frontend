@@ -165,5 +165,58 @@ void main() {
       expect(json['razorpay_signature'], 'sig_test_777');
       expect(json['payment_method'], 'upi');
     });
+
+    test('Payment-Before-Service: BookingStatus.stepIndex enforces payment at Step 0', () {
+      expect(BookingStatus.paymentPending.stepIndex, 0);
+      expect(BookingStatus.requested.stepIndex, 1);
+      expect(BookingStatus.accepted.stepIndex, 2);
+      expect(BookingStatus.workerEnroute.stepIndex, 2);
+      expect(BookingStatus.arrived.stepIndex, 2);
+      expect(BookingStatus.verifiedCheckin.stepIndex, 2);
+      expect(BookingStatus.inProgress.stepIndex, 3);
+      expect(BookingStatus.customerConfirmationPending.stepIndex, 4);
+      expect(BookingStatus.verifiedCheckout.stepIndex, 4);
+      expect(BookingStatus.customerConfirmed.stepIndex, 5);
+      expect(BookingStatus.completed.stepIndex, 5);
+      expect(BookingStatus.paymentReleased.stepIndex, 5);
+      expect(BookingStatus.cancelled.stepIndex, -1);
+      expect(BookingStatus.rejected.stepIndex, -1);
+    });
+
+    test('Payment-Before-Service: Unpaid booking has 0 workers and paymentPending status', () {
+      final json = {
+        'id': 'BK-P5-001',
+        'household_id': 'usr_house_01',
+        'service_id': 'Plumber',
+        'status': 'payment_pending',
+        'payment_status': 'pending',
+        'amount': 520.0,
+        'assigned_worker_count': 0,
+        'worker_id': null,
+        'allocation_status': 'PAYMENT_PENDING',
+      };
+
+      final b = Booking.fromJson(json);
+      expect(b.status, BookingStatus.paymentPending);
+      expect(b.paymentStatus, PaymentStatus.pending);
+      expect(b.assignedWorkerCount, 0);
+      expect(b.workerId, isEmpty);
+      expect(b.allocationStatus, 'PAYMENT_PENDING');
+
+      // Once payment is captured, worker can be allocated and status becomes accepted
+      final paid = b.copyWith(
+        status: BookingStatus.accepted,
+        paymentStatus: PaymentStatus.captured,
+        workerId: 'wrk_01',
+        workerName: 'Suresh Patil',
+        assignedWorkerCount: 1,
+        allocationStatus: 'ASSIGNED',
+      );
+      expect(paid.status, BookingStatus.accepted);
+      expect(paid.paymentStatus, PaymentStatus.captured);
+      expect(paid.assignedWorkerCount, 1);
+      expect(paid.workerId, 'wrk_01');
+      expect(paid.allocationStatus, 'ASSIGNED');
+    });
   });
 }

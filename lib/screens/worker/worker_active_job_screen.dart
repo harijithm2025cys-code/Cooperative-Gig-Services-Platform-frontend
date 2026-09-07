@@ -49,6 +49,17 @@ class _WorkerActiveJobScreenState extends State<WorkerActiveJobScreen> {
   }
 
   Future<void> _setStatus(BookingStatus newStatus) async {
+    if (_job.paymentStatus != PaymentStatus.captured &&
+        _job.paymentStatus != PaymentStatus.released &&
+        _job.paymentStatus != PaymentStatus.heldInEscrow) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Cannot proceed: Customer payment must be captured before service begins.'),
+          backgroundColor: AppColors.statusCancelled,
+        ),
+      );
+      return;
+    }
     setState(() => _isProcessing = true);
     final bookingProv = Provider.of<BookingProvider>(context, listen: false);
     final success = await bookingProv.updateStatus(_job.id, newStatus);

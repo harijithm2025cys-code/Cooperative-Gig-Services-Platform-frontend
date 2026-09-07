@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/booking.dart';
 import '../../models/worker.dart';
-import '../../models/assignment.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../utils/app_colors.dart';
@@ -349,32 +348,12 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
 
                         final bookingId = 'SC${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
 
-                        // Build assignment records for the requested count
-                        final List<BookingAssignment> generatedAssignments = List.generate(
-                          _requiredWorkerCount,
-                          (idx) => BookingAssignment(
-                            id: 'asgn_${bookingId}_${idx + 1}',
-                            bookingId: bookingId,
-                            workerId: 'wrk_coop_${idx + 1}',
-                            status: 'ASSIGNED',
-                            assignedAt: DateTime.now(),
-                            distanceKm: 1.8 + (idx * 0.7),
-                            matchingScore: 92.0 - (idx * 3.5),
-                            assignmentSequence: idx + 1,
-                            workerName: 'Cooperative Specialist #${idx + 1}',
-                            workerSkill: _serviceSkill,
-                            cooperativeName: 'Metro Labour Cooperative Federation',
-                          ),
-                        );
-
                         final newBooking = Booking(
                           id: bookingId,
-                          workerId: generatedAssignments[0].workerId,
-                          workerName: _requiredWorkerCount > 1
-                              ? '$_requiredWorkerCount Allocated Specialists'
-                              : 'Cooperative Specialist #1',
+                          workerId: '',
+                          workerName: 'Pending Payment & Matching',
                           workerSkill: _serviceSkill,
-                          workerPhone: '+91 98450 11223',
+                          workerPhone: '',
                           workerCoop: 'Metro Labour Cooperative Federation',
                           householdId: auth.currentUser?.id ?? 'usr_house_01',
                           householdName: auth.currentUser?.name ?? 'Ananya Sharma',
@@ -385,12 +364,13 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                           amount: totalEstimatedCost,
                           scheduledDate: _selectedDate,
                           scheduledTime: _selectedTime,
-                          notes: 'Service requested via Cooperative Gig Platform Automatic Allocation',
-                          status: BookingStatus.accepted,
+                          notes: 'Service requested via Cooperative Gig Platform',
+                          status: BookingStatus.paymentPending,
+                          paymentStatus: PaymentStatus.pending,
                           requiredWorkerCount: _requiredWorkerCount,
-                          assignedWorkerCount: _requiredWorkerCount,
-                          allocationStatus: 'ASSIGNED',
-                          assignments: generatedAssignments,
+                          assignedWorkerCount: 0,
+                          allocationStatus: 'PAYMENT_PENDING',
+                          assignments: const [],
                           createdAt: DateTime.now(),
                         );
 
@@ -403,12 +383,13 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                           scheduledDate: _selectedDate,
                           scheduledTime: _selectedTime,
                           notes: 'Auto-allocation requested for $_requiredWorkerCount worker(s)',
+                          requiredWorkerCount: _requiredWorkerCount,
                         );
 
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('✓ Automatically allocated $_requiredWorkerCount verified cooperative specialist(s)!'),
-                            backgroundColor: AppColors.statusCompleted,
+                            content: Text('✓ Booking created! Complete payment of ₹${totalEstimatedCost.toInt()} via Razorpay to dispatch specialist(s).'),
+                            backgroundColor: AppColors.primary,
                           ),
                         );
 
@@ -421,9 +402,9 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                       },
                       child: const Row(
                         children: [
-                          Text('Auto-Allocate & Book', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold)),
+                          Text('Proceed to Payment & Book', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold)),
                           SizedBox(width: 8),
-                          Icon(Icons.bolt_rounded, size: 18),
+                          Icon(Icons.payment_rounded, size: 18),
                         ],
                       ),
                     ),

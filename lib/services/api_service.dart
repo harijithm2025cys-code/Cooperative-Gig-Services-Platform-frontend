@@ -713,10 +713,10 @@ class ApiService {
     } catch (_) {
       final newBooking = Booking(
         id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-        workerId: workerId ?? 'wrk_auto_allocated',
-        workerName: workerName ?? (requiredWorkerCount > 1 ? '$requiredWorkerCount Allocated Specialists' : 'Cooperative Specialist'),
+        workerId: '',
+        workerName: 'Pending Payment & Matching',
         workerSkill: workerSkill,
-        workerPhone: workerPhone ?? '+91 98450 11223',
+        workerPhone: '',
         workerCoop: 'Metro Labour Cooperative Federation',
         householdId: householdId,
         householdName: currentUser?.name ?? 'Ananya Sharma',
@@ -724,14 +724,15 @@ class ApiService {
         serviceAddress: serviceAddress,
         latitude: lat,
         longitude: lng,
-        status: BookingStatus.accepted,
+        status: BookingStatus.paymentPending,
+        paymentStatus: PaymentStatus.pending,
         amount: amount,
         scheduledDate: scheduledDate,
         scheduledTime: scheduledTime,
         notes: notes,
         requiredWorkerCount: requiredWorkerCount,
-        assignedWorkerCount: requiredWorkerCount,
-        allocationStatus: 'ASSIGNED',
+        assignedWorkerCount: 0,
+        allocationStatus: 'PAYMENT_PENDING',
         createdAt: DateTime.now(),
       );
       _mockBookings.insert(0, newBooking);
@@ -1534,9 +1535,10 @@ class ApiService {
     }
     return {
       'success': true,
-      'status': 'accepted',
+      'status': 'payment_pending',
+      'payment_status': 'pending',
       'is_emergency': true,
-      'explanation': 'Priority Emergency Specialist dispatched within 12s SLA.',
+      'explanation': 'Emergency booking initialized. Payment required before rapid responder dispatch.',
     };
   }
 

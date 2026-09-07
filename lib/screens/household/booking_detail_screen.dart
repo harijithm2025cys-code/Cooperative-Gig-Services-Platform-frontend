@@ -52,27 +52,31 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   int _currentStepIndex(Booking b) {
+    if (b.paymentStatus == PaymentStatus.pending || b.status == BookingStatus.paymentPending) {
+      return 0;
+    }
     switch (b.status) {
-      case BookingStatus.requested:
-      case BookingStatus.rejected:
-      case BookingStatus.cancelled:
+      case BookingStatus.paymentPending:
         return 0;
+      case BookingStatus.requested:
+        return 1;
       case BookingStatus.accepted:
       case BookingStatus.workerEnroute:
       case BookingStatus.arrived:
-        return 1;
       case BookingStatus.verifiedCheckin:
-      case BookingStatus.paymentPending:
-      case BookingStatus.paymentReleased:
         return 2;
       case BookingStatus.inProgress:
         return 3;
       case BookingStatus.customerConfirmationPending:
+      case BookingStatus.verifiedCheckout:
         return 4;
       case BookingStatus.customerConfirmed:
-      case BookingStatus.verifiedCheckout:
       case BookingStatus.completed:
+      case BookingStatus.paymentReleased:
         return 5;
+      case BookingStatus.cancelled:
+      case BookingStatus.rejected:
+        return -1;
     }
   }
 
@@ -348,16 +352,27 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           settlementStatus: 'PENDING',
         );
         if (!mounted) return;
+
+        final updatedBooking = (_booking ?? booking).copyWith(
+          status: BookingStatus.accepted,
+          paymentStatus: PaymentStatus.captured,
+          paymentId: resp.razorpayPaymentId,
+          settlementStatus: 'PENDING',
+          workerId: verifyRes['worker_id']?.toString() ?? _booking?.workerId,
+          workerName: verifyRes['worker_name']?.toString() ??
+              (_booking?.workerName == 'Pending Payment & Matching' ? 'Cooperative Specialist' : _booking?.workerName),
+          assignedWorkerCount: (_booking?.assignedWorkerCount ?? 0) > 0 ? _booking!.assignedWorkerCount : (_booking?.requiredWorkerCount ?? 1),
+          allocationStatus: 'ASSIGNED',
+        );
+
         setState(() {
-          _booking = _booking?.copyWith(
-            paymentStatus: PaymentStatus.captured,
-            paymentId: resp.razorpayPaymentId,
-            settlementStatus: 'PENDING',
-          );
+          _booking = updatedBooking;
         });
+        bookingProv.setActiveBooking(updatedBooking);
+
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Payment ₹${amount.toInt()} CAPTURED via Razorpay! Settlement: PENDING completion.'),
+            content: Text('✓ Payment ₹${amount.toInt()} CAPTURED via Razorpay! Cooperative specialist allocated & dispatched.'),
             backgroundColor: AppColors.statusCompleted,
           ),
         );
@@ -825,6 +840,39 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                   booking.status != BookingStatus.customerConfirmed &&
                   booking.status != BookingStatus.cancelled) ...[
                 if (booking.paymentStatus != PaymentStatus.captured && booking.paymentStatus != PaymentStatus.released) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.shield_outlined, color: Color(0xFFD97706), size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Payment Required Before Specialist Dispatch',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF92400E)),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Cooperative workers are not dispatched until advance payment of ₹${(booking.amount > 0 ? booking.amount : 420).toInt()} is confirmed. Funds remain protected in platform escrow.',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFFB45309)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -838,8 +886,8 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                           : const Icon(Icons.bolt_rounded, color: Color(0xFF00BAF2), size: 22),
                       label: Text(_isProcessing
                               ? 'PREPARING RAZORPAY CHECKOUT...'
-                              : 'PAY ₹${(booking.amount > 0 ? booking.amount : 420).toInt()} VIA RAZORPAY →',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                              : '⚡ PAY ₹${(booking.amount > 0 ? booking.amount : 420).toInt()} VIA RAZORPAY TO DISPATCH SPECIALIST →',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Colors.white)),
                       onPressed: _isProcessing ? null : () => _handleRazorpayPayment(booking),
                     ),
                   ),
@@ -1043,6 +1091,83 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget _buildEtaAndTrackingCard(Booking booking) {
+    final bool isUnpaid = booking.paymentStatus == PaymentStatus.pending || booking.status == BookingStatus.paymentPending;
+    if (isUnpaid) {
+      final double amt = booking.amount > 0 ? booking.amount : 420.0;
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: App3D.card3D(
+          backgroundColor: const Color(0xFFFFFBEB),
+          borderRadius: 20,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFEF3C7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.lock_clock_rounded, color: Color(0xFFD97706), size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Dispatch On Hold: Payment Required',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF92400E))),
+                      SizedBox(height: 2),
+                      Text(
+                        'Specialist allocation & live GPS tracking activate once payment is captured.',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFFB45309)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.payment_rounded, color: Color(0xFFD97706), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      '₹${amt.toInt()} Advance Payment',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF0C2340),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.bolt_rounded, size: 16, color: Color(0xFF00BAF2)),
+                    label: const Text('Pay Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
+                    onPressed: _isProcessing ? null : () => _handleRazorpayPayment(booking),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final bool isTracking = booking.status == BookingStatus.workerEnroute ||
         booking.status == BookingStatus.accepted ||
         booking.status == BookingStatus.arrived;
@@ -1157,6 +1282,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget _buildHeroCard(Booking booking) {
+    final bool isUnpaid = booking.paymentStatus == PaymentStatus.pending || booking.status == BookingStatus.paymentPending;
     final bool isCancelled = booking.status == BookingStatus.cancelled;
     final bool isDone = booking.status == BookingStatus.completed;
     final bool isPending = booking.status == BookingStatus.requested;
@@ -1165,34 +1291,42 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
         ? AppColors.statusCancelled
         : isDone
             ? AppColors.statusCompleted
-            : isPending
-                ? AppColors.primary
-                : isEnroute
-                    ? AppColors.statusAccepted
-                    : AppColors.statusInProgress;
+            : isUnpaid
+                ? const Color(0xFFD97706)
+                : isPending
+                    ? AppColors.primary
+                    : isEnroute
+                        ? AppColors.statusAccepted
+                        : AppColors.statusInProgress;
     final IconData heroIcon = isCancelled
         ? Icons.cancel_outlined
         : isDone
             ? Icons.check
-            : isPending
-                ? Icons.hourglass_top_rounded
-                : isEnroute
-                    ? Icons.two_wheeler_rounded
-                    : Icons.build_rounded;
+            : isUnpaid
+                ? Icons.payment_rounded
+                : isPending
+                    ? Icons.hourglass_top_rounded
+                    : isEnroute
+                        ? Icons.two_wheeler_rounded
+                        : Icons.build_rounded;
     final String heroTitle = isCancelled
         ? 'Booking Cancelled'
         : isDone
             ? 'Booking Completed!'
-            : isPending
-                ? 'Request Sent to Worker'
-                : isEnroute
-                    ? 'Worker Dispatched'
-                    : booking.status.label;
+            : isUnpaid
+                ? 'Payment Required Before Dispatch'
+                : isPending
+                    ? 'Request Sent to Worker'
+                    : isEnroute
+                        ? 'Worker Dispatched'
+                        : booking.status.label;
     final String heroSub = isCancelled
         ? (booking.cancellationReason ?? 'This booking was cancelled and specialists released.')
-        : isPending
-            ? 'Waiting for ${booking.workerName} to accept your request…'
-            : 'Order #${booking.id} • ${booking.workerSkill}';
+        : isUnpaid
+            ? 'Please pay ₹${(booking.amount > 0 ? booking.amount : 420).toInt()} via Razorpay to initiate cooperative worker matching and dispatch.'
+            : isPending
+                ? 'Waiting for ${booking.workerName} to accept your request…'
+                : 'Order #${booking.id} • ${booking.workerSkill}';
 
     return Container(
       width: double.infinity,
@@ -1218,28 +1352,40 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           Text(
             heroTitle,
             style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
           Text(
             heroSub,
             style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: AppColors.primaryContainer,
+              color: isUnpaid ? const Color(0xFFFEF3C7) : AppColors.primaryContainer,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFDDD6FE)),
+              border: Border.all(color: isUnpaid ? const Color(0xFFFDE68A) : const Color(0xFFDDD6FE)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.account_circle, color: AppColors.primaryLight, size: 20),
+                Icon(
+                  isUnpaid ? Icons.lock_clock_rounded : Icons.account_circle,
+                  color: isUnpaid ? const Color(0xFFB45309) : AppColors.primaryLight,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Text(
-                  'Worker assigned: ${booking.workerName}',
-                  style: const TextStyle(color: AppColors.primaryDark, fontWeight: FontWeight.bold, fontSize: 13.5),
+                  isUnpaid
+                      ? 'Specialist dispatch on hold until payment'
+                      : 'Worker assigned: ${booking.workerName}',
+                  style: TextStyle(
+                    color: isUnpaid ? const Color(0xFF92400E) : AppColors.primaryDark,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13.5,
+                  ),
                 ),
               ],
             ),
@@ -1251,11 +1397,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
   Widget _buildStepperCard(int currentStep, Booking booking) {
     final List<Map<String, dynamic>> steps = [
-      {'title': 'Request Sent', 'subtitle': 'Request dispatched to worker', 'icon': Icons.send_rounded},
-      {'title': 'Worker Accepted', 'subtitle': 'Worker accepted & en route', 'icon': Icons.two_wheeler_rounded},
-      {'title': 'Check-In Verified + Payment', 'subtitle': 'Dual OTP + GPS verified; escrow paid', 'icon': Icons.verified_user_rounded},
-      {'title': 'Service In Progress', 'subtitle': 'Worker performing the service', 'icon': Icons.build_rounded},
-      {'title': 'Check-Out + Complete', 'subtitle': 'Dual check-out; payout released', 'icon': Icons.check_circle_rounded, 'isLast': true},
+      {'title': 'Customer Payment', 'subtitle': 'Advance payment via Razorpay to initiate dispatch', 'icon': Icons.payment_rounded},
+      {'title': 'Specialist Matching', 'subtitle': 'Payment verified • Matching cooperative worker', 'icon': Icons.groups_rounded},
+      {'title': 'Specialist Dispatched', 'subtitle': 'Worker accepted & en route to premises', 'icon': Icons.two_wheeler_rounded},
+      {'title': 'Service In Progress', 'subtitle': 'Specialist performing verified service', 'icon': Icons.build_rounded},
+      {'title': 'Inspection & Acceptance (OTP)', 'subtitle': 'Customer inspects work and confirms with OTP', 'icon': Icons.verified_user_rounded},
+      {'title': 'Service Completed', 'subtitle': 'Invoice generated; payout settlement eligible', 'icon': Icons.check_circle_rounded, 'isLast': true},
     ];
     return Container(
       width: double.infinity,
@@ -1267,7 +1414,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Service Progress (5-Step FSM)', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+          const Text('Service Progress (6-Step Lifecycle)', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
           const SizedBox(height: 20),
           for (int i = 0; i < steps.length; i++)
             _buildStep(

@@ -196,23 +196,24 @@ class BookingProvider with ChangeNotifier {
       // Return a safe local booking fallback so user flow never halts
       final fallbackBooking = Booking(
         id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
-        workerId: workerId ?? 'wrk_auto_allocated',
-        workerName: workerName ?? 'Cooperative Specialist',
+        workerId: '',
+        workerName: 'Pending Payment & Matching',
         workerSkill: workerSkill,
-        workerPhone: workerPhone ?? '+91 98450 11223',
+        workerPhone: '',
         householdId: householdId,
         householdName: 'Ananya Sharma',
         householdPhone: '+91 98765 12345',
         serviceAddress: serviceAddress,
-        status: BookingStatus.requested,
+        status: BookingStatus.paymentPending,
+        paymentStatus: PaymentStatus.pending,
         amount: amount,
         scheduledDate: scheduledDate,
         scheduledTime: scheduledTime,
         notes: notes,
         createdAt: DateTime.now(),
         requiredWorkerCount: requiredWorkerCount,
-        assignedWorkerCount: requiredWorkerCount,
-        allocationStatus: 'ASSIGNED',
+        assignedWorkerCount: 0,
+        allocationStatus: 'PAYMENT_PENDING',
       );
       _householdBookings.insert(0, fallbackBooking);
       _currentActiveBooking = fallbackBooking;

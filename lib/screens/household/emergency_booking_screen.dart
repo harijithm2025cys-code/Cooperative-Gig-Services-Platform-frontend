@@ -4,6 +4,7 @@ import '../../models/booking.dart';
 import '../../providers/booking_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/location_service.dart';
+import '../../services/razorpay_service.dart';
 import '../../utils/app_colors.dart';
 import 'booking_detail_screen.dart';
 
@@ -111,15 +112,14 @@ class _EmergencyBookingScreenState extends State<EmergencyBookingScreen> {
 
     final result = await ApiService().createEmergencyDispatch(payload);
     if (!mounted) return;
-    setState(() => _isDispatching = false);
-
     final String bId = result['id']?.toString() ?? 'EMG-${DateTime.now().millisecondsSinceEpoch % 100000}';
-    final newBooking = Booking(
+
+    var booking = Booking(
       id: bId,
-      workerId: result['worker_id']?.toString() ?? 'wrk_emg_01',
-      workerName: result['worker_name']?.toString() ?? 'Kiran Kumar (Co-op Rapid Responder)',
+      workerId: '',
+      workerName: 'Pending Payment & Rapid Matching',
       workerSkill: _selectedService,
-      workerPhone: result['worker_phone']?.toString() ?? '+91 98450 99887',
+      workerPhone: '',
       workerCoop: 'Labour Cooperative Rapid Response Unit',
       householdId: 'usr_house_01',
       householdName: 'Household Client',
@@ -127,7 +127,8 @@ class _EmergencyBookingScreenState extends State<EmergencyBookingScreen> {
       serviceAddress: _addressController.text.trim(),
       latitude: _lat,
       longitude: _lng,
-      status: BookingStatus.accepted,
+      status: BookingStatus.paymentPending,
+      paymentStatus: PaymentStatus.pending,
       amount: total,
       scheduledDate: 'Immediate',
       scheduledTime: 'Right Now (24/7 SOS)',
@@ -135,71 +136,136 @@ class _EmergencyBookingScreenState extends State<EmergencyBookingScreen> {
       notes: payload['notes'] as String,
       isEmergency: true,
       etaFormatted: '~10 mins (Priority Express Transit)',
+      allocationStatus: 'PAYMENT_PENDING',
     );
 
-    Provider.of<BookingProvider>(context, listen: false).setActiveBooking(newBooking);
+    Provider.of<BookingProvider>(context, listen: false).setActiveBooking(booking);
 
-    // Show immediate success dialog
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: AppColors.statusCompleted, size: 28),
-            SizedBox(width: 10),
-            Text('Specialist Dispatched!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEE2E2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFCA5A5)),
-              ),
-              child: const Row(
+    // Step 2: Open Razorpay checkout immediately for advance emergency payment
+    final order = await ApiService().createPaymentOrder(
+      bookingId: bId,
+      amount: total,
+    );
+
+    if (!mounted) {
+      setState(() => _isDispatching = false);
+      return;
+    }
+
+    if (order != null) {
+      final resp = await RazorpayService().openCheckout(
+        context: context,
+        order: order,
+        customerName: 'Household Client',
+        customerEmail: 'customer@cooperativegig.in',
+        customerPhone: '+91 98765 12345',
+        serviceTitle: 'Emergency $_selectedService Dispatch',
+      );
+
+      if (resp != null && mounted) {
+        final verifyRes = await ApiService().verifyPayment(
+          razorpayOrderId: resp.razorpayOrderId,
+          razorpayPaymentId: resp.razorpayPaymentId,
+          razorpaySignature: resp.razorpaySignature,
+          bookingId: bId,
+        );
+        if (!mounted) return;
+
+        if (verifyRes['payment_status'] == 'CAPTURED' || verifyRes['status'] == 'success') {
+          final allocWorker = verifyRes['worker_name']?.toString() ?? 'Kiran Kumar (Co-op Rapid Responder)';
+          final allocPhone = verifyRes['worker_phone']?.toString() ?? '+91 98450 99887';
+          booking = booking.copyWith(
+            status: BookingStatus.accepted,
+            paymentStatus: PaymentStatus.captured,
+            paymentId: resp.razorpayPaymentId,
+            workerId: verifyRes['worker_id']?.toString() ?? 'wrk_emg_01',
+            workerName: allocWorker,
+            workerPhone: allocPhone,
+            assignedWorkerCount: 1,
+            allocationStatus: 'ASSIGNED',
+          );
+          Provider.of<BookingProvider>(context, listen: false).setActiveBooking(booking);
+
+          setState(() => _isDispatching = false);
+
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+              title: const Row(
                 children: [
-                  Icon(Icons.timer_rounded, color: Color(0xFFDC2626), size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text('12-Second Allocation SLA Met! Specialist accepted.',
-                        style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.bold, fontSize: 12.5)),
-                  ),
+                  Icon(Icons.check_circle_rounded, color: AppColors.statusCompleted, size: 28),
+                  SizedBox(width: 10),
+                  Text('Payment Captured & Dispatched!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ],
               ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFFCA5A5)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.timer_rounded, color: Color(0xFFDC2626), size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text('Payment verified! Nearest rapid responder allocated.',
+                              style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.bold, fontSize: 12.5)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('Specialist: ${booking.workerName}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  const SizedBox(height: 4),
+                  Text('Category: $_selectedService • ETA: ${booking.etaFormatted}',
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
+                  const SizedBox(height: 4),
+                  Text('Direct Total Paid: ₹${total.toInt()} (includes 25% emergency tariff)',
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                ],
+              ),
+              actions: [
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => BookingDetailScreen(booking: booking)),
+                    );
+                  },
+                  child: const Text('Track Specialist Live →'),
+                ),
+              ],
             ),
-            const SizedBox(height: 14),
-            Text('Specialist: ${newBooking.workerName}',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 4),
-            Text('Category: $_selectedService • ETA: ${newBooking.etaFormatted}',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5)),
-            const SizedBox(height: 4),
-            Text('Direct Secure Total: ₹${total.toInt()} (includes 25% emergency tariff)',
-                style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
-          ],
+          );
+          return;
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() => _isDispatching = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment pending for ₹${total.toInt()}. Dispatch will initiate upon payment completion.'),
+          backgroundColor: AppColors.primary,
         ),
-        actions: [
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppColors.primary),
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => BookingDetailScreen(booking: newBooking)),
-              );
-            },
-            child: const Text('Track Specialist Live →'),
-          ),
-        ],
-      ),
-    );
+      );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => BookingDetailScreen(booking: booking)),
+      );
+    }
   }
 
   @override
@@ -446,10 +512,10 @@ class _EmergencyBookingScreenState extends State<EmergencyBookingScreen> {
                           children: [
                             SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
                             SizedBox(width: 12),
-                            Text('Locating Nearest Specialist…', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                            Text('Securing Payment & Dispatching…', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                           ],
                         )
-                      : const Text('DISPATCH SPECIALIST RIGHT NOW 🚨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      : const Text('PAY & DISPATCH SPECIALIST NOW 🚨', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                   onPressed: _isDispatching ? null : _handleEmergencyDispatch,
                 ),
               ),
