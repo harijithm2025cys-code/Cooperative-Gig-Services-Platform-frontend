@@ -9,8 +9,11 @@ import '../../utils/constants.dart';
 import '../../widgets/custom_map_widget.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/worker_card.dart';
+import '../../services/api_service.dart';
 import 'service_picker_screen.dart';
 import 'book_service_screen.dart';
+import 'booking_detail_screen.dart';
+import 'bulk_booking_screen.dart';
 
 class HouseholdHomeScreen extends StatefulWidget {
   const HouseholdHomeScreen({super.key});
@@ -50,6 +53,53 @@ class _HouseholdHomeScreenState extends State<HouseholdHomeScreen> {
     );
   }
 
+  void _triggerEmergencySos() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+            SizedBox(width: 8),
+            Text('24/7 Emergency SOS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          'Dispatch nearest verified cooperative emergency technician immediately?\n\n• Response SLA: Under 15 minutes\n• Tariff: Standard + 25% emergency rate\n• Dual OTP check-in protected',
+          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            icon: const Icon(Icons.bolt, size: 18),
+            label: const Text('DISPATCH NOW'),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('🚨 Emergency SOS Dispatched! Finding closest specialist...'), backgroundColor: Colors.red),
+              );
+              final emgBooking = await ApiService().createEmergencyBooking(
+                serviceSkill: 'Electrician',
+                address: '123, 4th Cross, Koramangala 5th Block, Bengaluru',
+                latitude: 12.9716,
+                longitude: 77.5946,
+                notes: 'EMERGENCY DISPATCH: Urgent short circuit / water leak.',
+              );
+              if (!mounted) return;
+              Provider.of<BookingProvider>(context, listen: false).setActiveBooking(emgBooking);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => BookingDetailScreen(booking: emgBooking)),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
@@ -69,18 +119,23 @@ class _HouseholdHomeScreenState extends State<HouseholdHomeScreen> {
           ),
           PopupMenuButton<UserRole>(
             icon: const Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
-            tooltip: 'Switch Portal',
+            tooltip: 'Switch Portal Persona',
             onSelected: (role) {
               auth.switchRole(role);
-              if (role == UserRole.worker) {
+              if (role == UserRole.cooperativeWorker || role == UserRole.independentWorker) {
                 Navigator.pushReplacementNamed(context, AppRoutes.workerHome);
-              } else if (role == UserRole.admin) {
+              } else if (role == UserRole.cooperativeAssociationHead || role == UserRole.superAdmin) {
                 Navigator.pushReplacementNamed(context, '/admin_dashboard');
+              } else {
+                Navigator.pushReplacementNamed(context, AppRoutes.householdHome);
               }
             },
             itemBuilder: (ctx) => const [
-              PopupMenuItem(value: UserRole.worker, child: Text('Switch to Worker Hub')),
-              PopupMenuItem(value: UserRole.admin, child: Text('Switch to Admin Portal')),
+              PopupMenuItem(value: UserRole.customer, child: Text('1. Customer (Household)')),
+              PopupMenuItem(value: UserRole.cooperativeWorker, child: Text('2. Co-op Worker-Owner')),
+              PopupMenuItem(value: UserRole.independentWorker, child: Text('3. Independent Worker')),
+              PopupMenuItem(value: UserRole.cooperativeAssociationHead, child: Text('4. Association Head')),
+              PopupMenuItem(value: UserRole.superAdmin, child: Text('5. Super Admin (Federation)')),
             ],
           ),
           IconButton(
@@ -207,6 +262,83 @@ class _HouseholdHomeScreenState extends State<HouseholdHomeScreen> {
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 16),
+
+              // Phase 2 Quick Actions: 24/7 Emergency SOS + Institutional Bulk Hub
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: _triggerEmergencySos,
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        decoration: App3D.card3D(
+                          backgroundColor: const Color(0xFFFEF2F2),
+                          borderRadius: 16,
+                          border: Border.all(color: const Color(0xFFFCA5A5), width: 1.2),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(color: Color(0xFFEF4444), shape: BoxShape.circle),
+                              child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 18),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: const [
+                                  Text('24/7 SOS', style: TextStyle(color: Color(0xFF991B1B), fontWeight: FontWeight.bold, fontSize: 13.5)),
+                                  Text('Instant Emergency', style: TextStyle(color: Color(0xFFB91C1C), fontSize: 10.5)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const BulkBookingScreen()),
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        decoration: App3D.card3D(
+                          backgroundColor: const Color(0xFFEEF2FF),
+                          borderRadius: 16,
+                          border: Border.all(color: const Color(0xFFC7D2FE), width: 1.2),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(color: Color(0xFF4F46E5), shape: BoxShape.circle),
+                              child: const Icon(Icons.domain_rounded, color: Colors.white, size: 18),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: const [
+                                  Text('Bulk Booking', style: TextStyle(color: Color(0xFF3730A3), fontWeight: FontWeight.bold, fontSize: 13.5)),
+                                  Text('Multi-Trade Teams', style: TextStyle(color: Color(0xFF4338CA), fontSize: 10.5)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
 

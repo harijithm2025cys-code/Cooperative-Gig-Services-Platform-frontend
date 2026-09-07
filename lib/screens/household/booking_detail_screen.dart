@@ -916,10 +916,14 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget _buildOtpCard(Booking booking) {
-    if (booking.verificationOtp == null || booking.verificationOtp!.isEmpty) return const SizedBox.shrink();
+    if (booking.verificationOtp == null || booking.verificationOtp!.isEmpty) {
+      return const SizedBox.shrink();
+    }
     if (booking.status == BookingStatus.requested ||
         booking.status == BookingStatus.rejected ||
-        booking.status == BookingStatus.cancelled) return const SizedBox.shrink();
+        booking.status == BookingStatus.cancelled) {
+      return const SizedBox.shrink();
+    }
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -969,6 +973,24 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             hLabel: 'You Verified',
             wLabel: 'Worker Verified',
           ),
+          if (!booking.householdVerifiedCheckin &&
+              (booking.status == BookingStatus.accepted ||
+                  booking.status == BookingStatus.workerEnroute ||
+                  booking.status == BookingStatus.inProgress)) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: const Icon(Icons.pin_rounded, size: 16),
+                label: const Text('Enter Check-In OTP', style: TextStyle(fontSize: 12)),
+                onPressed: () => _showOtpDialog(
+                  title: 'Verify Worker Check-In',
+                  hint: 'Enter the 6-digit OTP to confirm worker arrived',
+                  onConfirm: () => _handleVerifyCheckIn(booking),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           _buildVerifyBadgeRow(
             label: 'Step 5: Check-Out Verification',
@@ -977,6 +999,21 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             hLabel: 'You Confirmed',
             wLabel: 'Worker Confirmed',
           ),
+          if (booking.householdVerifiedCheckin && !booking.householdVerifiedCheckout && booking.status == BookingStatus.inProgress) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                icon: const Icon(Icons.pin_rounded, size: 16),
+                label: const Text('Enter Completion OTP', style: TextStyle(fontSize: 12)),
+                onPressed: () => _showOtpDialog(
+                  title: 'Verify Work Completion',
+                  hint: 'Enter the 6-digit OTP to complete job',
+                  onConfirm: () => _handleVerifyCheckOut(booking),
+                ),
+              ),
+            ),
+          ],
           if (booking.paymentStatus != PaymentStatus.pending) ...[
             const SizedBox(height: 12),
             Container(

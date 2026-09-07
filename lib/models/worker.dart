@@ -16,6 +16,11 @@ class Worker {
   final double? matchScore;
   final int? experienceYears;
 
+  final String? workerType; // 'cooperative' or 'independent'
+  final String? cooperativeId;
+  final String? memberRegId;
+  final bool isPreVerifiedByAssociation;
+
   const Worker({
     required this.id,
     required this.name,
@@ -28,12 +33,19 @@ class Worker {
     this.isVerified = true,
     this.hourlyRate = 350.0,
     this.phone = '+91 98450 11223',
-    this.cooperativeName = 'Bengaluru Labour Guild Co-op',
+    this.cooperativeName = 'ABC Skilled Workers Co-op',
     this.completedJobs = 142,
     this.bio = 'Certified professional member-owner offering trusted service.',
     this.matchScore,
     this.experienceYears,
+    this.workerType = 'cooperative',
+    this.cooperativeId,
+    this.memberRegId,
+    this.isPreVerifiedByAssociation = true,
   });
+
+  bool get isCooperativeWorker => workerType != 'independent';
+  bool get isIndependentWorker => workerType == 'independent';
 
   String get initials {
     final parts = name.trim().split(' ');

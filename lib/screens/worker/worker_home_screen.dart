@@ -81,18 +81,23 @@ class _WorkerHomeScreenState extends State<WorkerHomeScreen> {
         actions: [
           PopupMenuButton<UserRole>(
             icon: const Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
-            tooltip: 'Switch Portal',
+            tooltip: 'Switch Portal Persona',
             onSelected: (role) {
               auth.switchRole(role);
-              if (role == UserRole.household) {
-                Navigator.pushReplacementNamed(context, AppRoutes.householdHome);
-              } else if (role == UserRole.admin) {
+              if (role == UserRole.cooperativeWorker || role == UserRole.independentWorker) {
+                Navigator.pushReplacementNamed(context, AppRoutes.workerHome);
+              } else if (role == UserRole.cooperativeAssociationHead || role == UserRole.superAdmin) {
                 Navigator.pushReplacementNamed(context, '/admin_dashboard');
+              } else {
+                Navigator.pushReplacementNamed(context, AppRoutes.householdHome);
               }
             },
             itemBuilder: (ctx) => const [
-              PopupMenuItem(value: UserRole.household, child: Text('Switch to Household Portal')),
-              PopupMenuItem(value: UserRole.admin, child: Text('Switch to Admin Portal')),
+              PopupMenuItem(value: UserRole.customer, child: Text('1. Customer (Household)')),
+              PopupMenuItem(value: UserRole.cooperativeWorker, child: Text('2. Co-op Worker-Owner')),
+              PopupMenuItem(value: UserRole.independentWorker, child: Text('3. Independent Worker')),
+              PopupMenuItem(value: UserRole.cooperativeAssociationHead, child: Text('4. Association Head')),
+              PopupMenuItem(value: UserRole.superAdmin, child: Text('5. Super Admin (Federation)')),
             ],
           ),
           IconButton(

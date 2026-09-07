@@ -29,4 +29,13 @@ class ApiConfig {
 
   static const String ratings = '/ratings';
   static const String adminStats = '/admin/stats';
+
+  // Phase 2 Endpoints
+  static const String tariffs = '/tariffs';
+  static const String bulkBookings = '/bulk-bookings';
+  static String assignBulkBooking(String id) => '/bulk-bookings/$id/assign';
+  static const String emergencyBooking = '/bookings/emergency';
+  static const String workloadFairness = '/admin/workload-fairness';
+  static const String emergencyDispatches = '/admin/emergency-dispatches';
 }
+

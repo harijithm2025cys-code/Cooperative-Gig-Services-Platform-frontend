@@ -198,12 +198,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         SegmentedButton<UserRole>(
                           segments: const [
                             ButtonSegment(
-                              value: UserRole.household,
-                              label: Text('Household', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                              value: UserRole.customer,
+                              label: Text('Customer', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                               icon: Icon(Icons.home_outlined, size: 18),
                             ),
                             ButtonSegment(
-                              value: UserRole.worker,
+                              value: UserRole.cooperativeWorker,
                               label: Text('Worker-Owner', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                               icon: Icon(Icons.handyman_outlined, size: 18),
                             ),

@@ -7,6 +7,8 @@ import '../models/user.dart';
 import '../models/worker.dart';
 import '../models/booking.dart';
 import '../models/admin_stats.dart';
+import '../models/tariff.dart';
+import '../models/bulk_booking.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
@@ -24,7 +26,7 @@ class ApiService {
     name: 'Ananya Sharma',
     phone: '+91 98765 12345',
     email: 'ananya@example.com',
-    role: UserRole.household,
+    role: UserRole.customer,
     address: 'Flat 402, Green Glen Layout, Bellandur, Bengaluru',
   );
 
@@ -448,13 +450,37 @@ class ApiService {
     required String email,
     required String password,
     required UserRole role,
+    String? address,
+    String? skill,
+    String? cooperativeId,
+    String? memberRegId,
+    String? workerType,
+    double? hourlyRate,
+    String? societyName,
+    String? district,
   }) async {
+    final roleStr = role == UserRole.cooperativeWorker
+        ? 'cooperative_worker'
+        : (role == UserRole.independentWorker
+            ? 'independent_worker'
+            : (role == UserRole.cooperativeAssociationHead
+                ? 'cooperative_association_head'
+                : (role == UserRole.superAdmin ? 'super_admin' : 'customer')));
+
     final payload = {
       'name': name,
       'phone': phone,
-      'email': email.isNotEmpty ? email : null,
+      'email': email.isNotEmpty ? email : '$phone@coop.local',
       'password': password,
-      'role': role.name,
+      'role': roleStr,
+      'address': address,
+      'skill': skill,
+      'cooperative_id': cooperativeId,
+      'member_reg_id': memberRegId,
+      'worker_type': workerType ?? (role == UserRole.cooperativeWorker ? 'cooperative' : (role == UserRole.independentWorker ? 'independent' : null)),
+      'hourly_rate': hourlyRate,
+      'society_name': societyName,
+      'district': district,
     };
 
     try {
@@ -464,23 +490,26 @@ class ApiService {
       await saveToken(token.toString());
       final user = User.fromJson(data['user'] ?? data, token: token.toString());
       currentUser = user;
-      if (role == UserRole.worker) {
+      if (user.isCooperativeWorker || user.isIndependentWorker) {
         _mockWorkers.insert(0, Worker(
           id: user.id,
           name: name,
-          skill: 'General Specialist',
+          skill: skill ?? 'Certified Specialist',
           rating: 5.0,
           reviewsCount: 1,
           distanceKm: 0.8,
-          isVerified: true,
+          isVerified: user.isCooperativeWorker,
           phone: phone,
-          cooperativeName: 'Bengaluru Labour Guild Co-op',
+          cooperativeName: user.isCooperativeWorker ? (societyName ?? 'ABC Skilled Workers Co-op') : 'Independent',
         ));
       }
       return user;
     } catch (_) {
       final dummyToken = 'jwt_token_${DateTime.now().millisecondsSinceEpoch}';
       await saveToken(dummyToken);
+      final isCoop = role == UserRole.cooperativeWorker;
+      final isIndep = role == UserRole.independentWorker;
+
       final user = User(
         id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
         name: name,
@@ -488,20 +517,26 @@ class ApiService {
         email: email,
         role: role,
         token: dummyToken,
-        cooperativeName: role == UserRole.worker ? 'Bengaluru Labour Guild Co-op' : null,
+        cooperativeId: isCoop ? (cooperativeId ?? 'coop_01') : null,
+        cooperativeName: isCoop ? (societyName ?? 'ABC Skilled Workers Co-op (Member #1042)') : null,
+        federationName: (role == UserRole.superAdmin || role == UserRole.cooperativeAssociationHead) ? 'Karnataka State Labour Cooperative Federation' : null,
+        memberRegId: isCoop ? (memberRegId ?? 'ABC-COOP-1042') : null,
+        workerType: isCoop ? 'cooperative' : (isIndep ? 'independent' : null),
+        isPreVerifiedByAssociation: isCoop,
+        address: address ?? 'Bengaluru, India',
       );
       currentUser = user;
-      if (role == UserRole.worker) {
+      if (isCoop || isIndep) {
         _mockWorkers.insert(0, Worker(
           id: user.id,
           name: name,
-          skill: 'Electrician & Technician',
+          skill: skill ?? 'Electrician & Technician',
           rating: 5.0,
           reviewsCount: 0,
           distanceKm: 0.5,
-          isVerified: true,
+          isVerified: isCoop,
           phone: phone,
-          cooperativeName: 'Bengaluru Labour Guild Co-op',
+          cooperativeName: isCoop ? (user.cooperativeName ?? 'ABC Skilled Workers Co-op') : 'Independent',
         ));
       }
       return user;
@@ -533,35 +568,58 @@ class ApiService {
     } catch (_) {
       final dummyToken = 'jwt_token_demo_user';
       await saveToken(dummyToken);
-      if (role == UserRole.worker) {
+      if (role == UserRole.cooperativeWorker) {
         currentUser = const User(
           id: 'wrk_1',
-          name: 'Ramesh Kumar (Worker-Owner)',
+          name: 'Dhanabalan R (Worker-Owner)',
           phone: '+91 98450 11223',
-          email: 'ramesh.worker@coop.org',
-          role: UserRole.worker,
-          cooperativeName: 'Bengaluru Electrical Workers Co-op',
+          email: 'dhanabalan.worker@coop.org',
+          role: UserRole.cooperativeWorker,
+          workerType: 'cooperative',
+          isPreVerifiedByAssociation: true,
+          cooperativeName: 'ABC Skilled Workers Co-op (Member #1042)',
           address: 'Jayanagar 4th Block, Bengaluru',
           token: 'jwt_token_demo_worker',
         );
-      } else if (role == UserRole.admin) {
+      } else if (role == UserRole.independentWorker) {
+        currentUser = const User(
+          id: 'wrk_ind_01',
+          name: 'Ajaipravin S (Independent Worker)',
+          phone: '+91 97890 55443',
+          email: 'ajaipravin.freelance@gmail.com',
+          role: UserRole.independentWorker,
+          workerType: 'independent',
+          address: 'Indiranagar 100ft Rd, Bengaluru',
+          token: 'jwt_token_demo_independent',
+        );
+      } else if (role == UserRole.cooperativeAssociationHead) {
         currentUser = const User(
           id: 'adm_01',
-          name: 'Priya Sundaram (Admin)',
+          name: 'Priya Sundaram (Association Head)',
           phone: '+91 98450 99999',
-          email: 'admin@coop.org',
-          role: UserRole.admin,
-          cooperativeName: 'Bengaluru District Labour Cooperative Union',
+          email: 'admin@abccoop.org',
+          role: UserRole.cooperativeAssociationHead,
+          cooperativeName: 'ABC Skilled Workers Cooperative Society',
           token: 'jwt_token_demo_admin',
+        );
+      } else if (role == UserRole.superAdmin) {
+        currentUser = const User(
+          id: 'super_adm_01',
+          name: 'State Federation Registrar (Super Admin)',
+          phone: '+91 99000 11111',
+          email: 'registrar@statefederation.gov.in',
+          role: UserRole.superAdmin,
+          federationName: 'National Labour Cooperative Federation of India',
+          token: 'jwt_token_demo_super_admin',
         );
       } else {
         currentUser = const User(
           id: 'usr_house_01',
-          name: 'Ananya Sharma',
+          name: 'Harijith M',
           phone: '+91 98765 12345',
-          email: 'ananya@example.com',
-          role: UserRole.household,
-          address: 'Flat 402, Green Glen Layout, Bellandur, Bengaluru',
+          email: 'harijith@example.com',
+          role: UserRole.customer,
+          address: 'Flat 402, Green Glen Layout, Koramangala, Bengaluru',
           token: 'jwt_token_demo_household',
         );
       }
@@ -1001,4 +1059,178 @@ class ApiService {
       return null;
     }
   }
+
+  // ==========================================
+  // PHASE 2 METHODS
+  // ==========================================
+
+  // 15. GET /tariffs
+  Future<List<CooperativeTariff>> getCooperativeTariffs({String? cooperativeId}) async {
+    try {
+      final res = await _dio.get(
+        ApiConfig.tariffs,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      if (res.data is Map && res.data['tariffs'] is List) {
+        return (res.data['tariffs'] as List)
+            .map((e) => CooperativeTariff.fromJson(e as Map<String, dynamic>))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('getCooperativeTariffs API failed, using standard rates: $e');
+    }
+
+    return const [
+      CooperativeTariff(id: 'trf_1', cooperativeId: 'coop_abc', serviceName: 'AC Service & Repair', hourlyRate: 450.0, baseFee: 150.0, emergencySurchargeRate: 1.25),
+      CooperativeTariff(id: 'trf_2', cooperativeId: 'coop_abc', serviceName: 'Plumbing & Pipe Repair', hourlyRate: 350.0, baseFee: 120.0, emergencySurchargeRate: 1.30),
+      CooperativeTariff(id: 'trf_3', cooperativeId: 'coop_abc', serviceName: 'Electrical & Wiring', hourlyRate: 380.0, baseFee: 120.0, emergencySurchargeRate: 1.35),
+      CooperativeTariff(id: 'trf_4', cooperativeId: 'coop_abc', serviceName: 'Carpentry & Furniture', hourlyRate: 400.0, baseFee: 150.0, emergencySurchargeRate: 1.20),
+      CooperativeTariff(id: 'trf_5', cooperativeId: 'coop_abc', serviceName: 'Deep House Cleaning', hourlyRate: 300.0, baseFee: 100.0, emergencySurchargeRate: 1.25),
+    ];
+  }
+
+  // 16. POST /tariffs
+  Future<bool> upsertTariff(CooperativeTariff tariff) async {
+    try {
+      final res = await _dio.post(ApiConfig.tariffs, data: tariff.toJson());
+      return res.statusCode == 200 || res.statusCode == 201;
+    } catch (e) {
+      debugPrint('upsertTariff API failed: $e');
+      return true; // Local optimistic success
+    }
+  }
+
+  // 17. POST /bookings/emergency (24/7 Priority Emergency SOS)
+  Future<Booking> createEmergencyBooking({
+    required String serviceSkill,
+    required String address,
+    required double latitude,
+    required double longitude,
+    String? notes,
+  }) async {
+    final payload = {
+      'service_id': serviceSkill,
+      'address': address,
+      'latitude': latitude,
+      'longitude': longitude,
+      'notes': notes ?? '24/7 Emergency Dispatch',
+      'estimated_amount': 550.0,
+      'is_emergency': true,
+    };
+
+    try {
+      final res = await _dio.post(ApiConfig.emergencyBooking, data: payload);
+      if (res.data is Map) {
+        return Booking.fromJson(Map<String, dynamic>.from(res.data));
+      }
+    } catch (e) {
+      debugPrint('createEmergencyBooking failed, activating immediate fallback: $e');
+    }
+
+    final fallback = Booking(
+      id: 'EMG-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+      workerId: 'wrk_1',
+      workerName: 'Dhanabalan R (Co-op Emergency Specialist)',
+      workerSkill: serviceSkill,
+      workerPhone: '+91 98450 11223',
+      workerCoop: 'ABC Skilled Workers Cooperative Society',
+      householdId: currentUser?.id ?? 'usr_house_01',
+      householdName: currentUser?.name ?? 'Household Customer',
+      householdPhone: currentUser?.phone ?? '+91 98765 12345',
+      serviceAddress: address,
+      latitude: latitude,
+      longitude: longitude,
+      status: BookingStatus.accepted,
+      amount: 550.0,
+      verificationOtp: '748291',
+      scheduledDate: 'Immediate 24/7 Priority',
+      scheduledTime: 'Dispatched (ETA 12 mins)',
+      notes: '[24/7 EMERGENCY SOS] Immediate assistance requested.',
+      createdAt: DateTime.now(),
+    );
+    _mockBookings.insert(0, fallback);
+    return fallback;
+  }
+
+  // 18. POST /bulk-bookings (Institutional Multi-Trade Procurement)
+  Future<BulkBooking> createBulkBooking({
+    String? institutionName,
+    required String contactPerson,
+    required String contactPhone,
+    required String serviceAddress,
+    required String scheduledDate,
+    required String scheduledTime,
+    required List<BulkBookingItem> trades,
+    bool isEmergency = false,
+    String? notes,
+  }) async {
+    final payload = {
+      'institution_name': institutionName,
+      'contact_person': contactPerson,
+      'contact_phone': contactPhone,
+      'service_address': serviceAddress,
+      'scheduled_date': scheduledDate,
+      'scheduled_time': scheduledTime,
+      'trades': trades.map((t) => t.toJson()).toList(),
+      'is_emergency': isEmergency,
+      'notes': notes,
+    };
+
+    try {
+      final res = await _dio.post(ApiConfig.bulkBookings, data: payload);
+      if (res.data is Map) {
+        return BulkBooking.fromJson(Map<String, dynamic>.from(res.data));
+      }
+    } catch (e) {
+      debugPrint('createBulkBooking API failed, fallback to local: $e');
+    }
+
+    final totalReq = trades.fold<int>(0, (sum, item) => sum + item.quantityRequested);
+    final totalAmt = trades.fold<double>(0.0, (sum, item) => sum + (item.quantityRequested * item.ratePerWorker * 4.0));
+
+    return BulkBooking(
+      id: 'BLK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+      customerId: currentUser?.id ?? 'usr_inst_01',
+      institutionName: institutionName,
+      contactPerson: contactPerson,
+      contactPhone: contactPhone,
+      serviceAddress: serviceAddress,
+      scheduledDate: scheduledDate,
+      scheduledTime: scheduledTime,
+      totalWorkersRequested: totalReq,
+      totalWorkersAssigned: 0,
+      status: 'requested',
+      totalEstimatedAmount: totalAmt,
+      isEmergency: isEmergency,
+      notes: notes,
+      items: trades,
+    );
+  }
+
+  // 19. GET /admin/workload-fairness
+  Future<Map<String, dynamic>> getWorkloadFairness({String? cooperativeId}) async {
+    try {
+      final res = await _dio.get(
+        ApiConfig.workloadFairness,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getWorkloadFairness API failed: $e');
+    }
+
+    return {
+      'success': true,
+      'total_workers': 3,
+      'distribution_summary': {'balanced_ratio': '96%', 'fairness_algorithm': 'Fi Multiplier Active'},
+      'workers': [
+        {'worker_id': 'wrk_1', 'name': 'Dhanabalan R', 'skill': 'Electrician', 'monthly_jobs': 3, 'fairness_multiplier': 17.5, 'workload_status': 'Balanced', 'allocation_priority': 'High'},
+        {'worker_id': 'wrk_2', 'name': 'Senthil Kumar', 'skill': 'Plumber', 'monthly_jobs': 1, 'fairness_multiplier': 22.5, 'workload_status': 'Balanced', 'allocation_priority': 'High (+25 pts)'},
+        {'worker_id': 'wrk_3', 'name': 'Lakshmi Devi', 'skill': 'Cleaner', 'monthly_jobs': 2, 'fairness_multiplier': 20.0, 'workload_status': 'Balanced', 'allocation_priority': 'High'}
+      ]
+    };
+  }
 }
+

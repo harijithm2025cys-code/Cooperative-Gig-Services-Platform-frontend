@@ -328,9 +328,13 @@ class Booking {
     final ps = json['payment_status']?.toString().toLowerCase();
     if (ps == 'released') {
       pStatus = PaymentStatus.released;
-    } else if (ps == 'held_in_escrow' || ps == 'held') pStatus = PaymentStatus.heldInEscrow;
-    else if (ps == 'refunded') pStatus = PaymentStatus.refunded;
-    else if (ps == 'failed') pStatus = PaymentStatus.failed;
+    } else if (ps == 'held_in_escrow' || ps == 'held') {
+      pStatus = PaymentStatus.heldInEscrow;
+    } else if (ps == 'refunded') {
+      pStatus = PaymentStatus.refunded;
+    } else if (ps == 'failed') {
+      pStatus = PaymentStatus.failed;
+    }
 
     return Booking(
       id: json['id']?.toString() ?? json['booking_id']?.toString() ?? json['_id']?.toString() ?? 'BK-001',

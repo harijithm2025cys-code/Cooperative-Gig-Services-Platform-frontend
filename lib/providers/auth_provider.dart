@@ -29,7 +29,7 @@ class AuthProvider with ChangeNotifier {
         name: 'Ananya Sharma',
         phone: '+91 98765 12345',
         email: 'ananya@example.com',
-        role: UserRole.household,
+        role: UserRole.customer,
         address: 'Flat 402, Green Glen Layout, Bellandur, Bengaluru',
       );
     }
@@ -67,6 +67,14 @@ class AuthProvider with ChangeNotifier {
     required String email,
     required String password,
     required UserRole role,
+    String? address,
+    String? skill,
+    String? cooperativeId,
+    String? memberRegId,
+    String? workerType,
+    double? hourlyRate,
+    String? societyName,
+    String? district,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -79,6 +87,14 @@ class AuthProvider with ChangeNotifier {
         email: email,
         password: password,
         role: role,
+        address: address,
+        skill: skill,
+        cooperativeId: cooperativeId,
+        memberRegId: memberRegId,
+        workerType: workerType,
+        hourlyRate: hourlyRate,
+        societyName: societyName,
+        district: district,
       );
       _currentUser = user;
       _isLoading = false;
@@ -99,34 +115,73 @@ class AuthProvider with ChangeNotifier {
   }
 
   void switchRole(UserRole newRole) {
-    if (newRole == UserRole.worker) {
-      _currentUser = const User(
-        id: 'wrk_1',
-        name: 'Ramesh Kumar (Worker-Owner)',
-        phone: '+91 98450 11223',
-        email: 'ramesh.worker@coop.org',
-        role: UserRole.worker,
-        cooperativeName: 'Bengaluru Electrical Workers Co-op',
-        address: 'Jayanagar 4th Block, Bengaluru',
-      );
-    } else if (newRole == UserRole.admin) {
-      _currentUser = const User(
-        id: 'adm_01',
-        name: 'Priya Sundaram (Admin)',
-        phone: '+91 98450 99999',
-        email: 'admin@coop.org',
-        role: UserRole.admin,
-        cooperativeName: 'Bengaluru District Labour Cooperative Union',
-      );
-    } else {
-      _currentUser = const User(
-        id: 'usr_house_01',
-        name: 'Ananya Sharma',
-        phone: '+91 98765 12345',
-        email: 'ananya@example.com',
-        role: UserRole.household,
-        address: 'Flat 402, Green Glen Layout, Bellandur, Bengaluru',
-      );
+    switch (newRole) {
+      case UserRole.customer:
+        _currentUser = const User(
+          id: 'usr_house_01',
+          name: 'Harijith M',
+          phone: '+91 98765 12345',
+          email: 'harijith@example.com',
+          role: UserRole.customer,
+          address: 'Flat 402, Green Glen Layout, Koramangala, Bengaluru',
+        );
+        break;
+
+      case UserRole.cooperativeWorker:
+        _currentUser = const User(
+          id: 'wrk_1',
+          name: 'Dhanabalan R',
+          phone: '+91 98450 11223',
+          email: 'dhanabalan.worker@coop.org',
+          role: UserRole.cooperativeWorker,
+          workerType: 'cooperative',
+          isPreVerifiedByAssociation: true,
+          memberRegId: 'ABC-COOP-1042',
+          cooperativeId: 'coop_01',
+          cooperativeName: 'ABC Skilled Workers Co-op (Member #1042)',
+          address: 'Jayanagar 4th Block, Bengaluru',
+        );
+        break;
+
+      case UserRole.independentWorker:
+        _currentUser = const User(
+          id: 'wrk_ind_01',
+          name: 'Ajaipravin S',
+          phone: '+91 97890 55443',
+          email: 'ajaipravin.freelance@gmail.com',
+          role: UserRole.independentWorker,
+          workerType: 'independent',
+          isPreVerifiedByAssociation: false,
+          cooperativeName: null, // Outside cooperative hierarchy
+          address: 'Indiranagar 100ft Rd, Bengaluru',
+        );
+        break;
+
+      case UserRole.cooperativeAssociationHead:
+        _currentUser = const User(
+          id: 'adm_01',
+          name: 'Priya Sundaram (Association Head)',
+          phone: '+91 98450 99999',
+          email: 'head@abccoop.org',
+          role: UserRole.cooperativeAssociationHead,
+          cooperativeId: 'coop_01',
+          cooperativeName: 'ABC Skilled Workers Cooperative Society',
+          federationName: 'Karnataka State Labour Cooperative Federation',
+          address: 'District Cooperative Bhavan, Bengaluru',
+        );
+        break;
+
+      case UserRole.superAdmin:
+        _currentUser = const User(
+          id: 'super_adm_01',
+          name: 'State Federation Registrar (Super Admin)',
+          phone: '+91 99000 11111',
+          email: 'registrar@statefederation.gov.in',
+          role: UserRole.superAdmin,
+          federationName: 'National Labour Cooperative Federation of India',
+          address: 'State Secretariat, Vidhana Soudha, Bengaluru',
+        );
+        break;
     }
     notifyListeners();
   }

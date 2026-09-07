@@ -4,6 +4,7 @@ import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/constants.dart';
+import 'tariff_management_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -294,8 +295,58 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         break;
     }
 
+    final auth = Provider.of<AuthProvider>(context);
+    final isSuperAdmin = auth.currentUser?.isSuperAdmin == true;
+
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: Text(
+          isSuperAdmin ? 'State Federation Super Admin Hub' : 'District Cooperative Association Portal',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.price_change_rounded, color: AppColors.primary),
+            tooltip: 'Tariff Matrix & Fair Workload',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const TariffManagementScreen()),
+            ),
+          ),
+          PopupMenuButton<UserRole>(
+            icon: const Icon(Icons.swap_horiz_rounded, color: AppColors.primary),
+            tooltip: 'Switch Portal Persona',
+            onSelected: (role) {
+              auth.switchRole(role);
+              if (role == UserRole.cooperativeWorker || role == UserRole.independentWorker) {
+                Navigator.pushReplacementNamed(context, AppRoutes.workerHome);
+              } else if (role == UserRole.cooperativeAssociationHead || role == UserRole.superAdmin) {
+                Navigator.pushReplacementNamed(context, '/admin_dashboard');
+              } else {
+                Navigator.pushReplacementNamed(context, AppRoutes.householdHome);
+              }
+            },
+            itemBuilder: (ctx) => const [
+              PopupMenuItem(value: UserRole.customer, child: Text('1. Customer (Household)')),
+              PopupMenuItem(value: UserRole.cooperativeWorker, child: Text('2. Co-op Worker-Owner')),
+              PopupMenuItem(value: UserRole.independentWorker, child: Text('3. Independent Worker')),
+              PopupMenuItem(value: UserRole.cooperativeAssociationHead, child: Text('4. Association Head')),
+              PopupMenuItem(value: UserRole.superAdmin, child: Text('5. Super Admin (Federation)')),
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: AppColors.textSecondary, size: 20),
+            onPressed: () async {
+              await auth.logout();
+              if (context.mounted) {
+                Navigator.pushReplacementNamed(context, AppRoutes.login);
+              }
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: SafeArea(child: activeBody),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
