@@ -74,5 +74,35 @@ class ApiConfig {
   static const String complaints = '/complaints/';
   static String cooperativeComplaints(String coopId) => '/complaints/cooperative/$coopId';
   static String resolveComplaint(String id) => '/complaints/$id/resolve';
+
+  // Phase 6 Endpoints — Association Head Scoped Management
+  static const String associationDashboard = '/association/dashboard';
+  static const String associationWorkers = '/association/workers';
+  static String associationWorkerDetail(String workerId) => '/association/workers/$workerId';
+  static const String associationServices = '/association/services';
+  static String associationServiceDetail(String serviceId) => '/association/services/$serviceId';
+  static const String associationBookings = '/association/bookings';
+  static const String associationOperations = '/association/operations';
+  static const String associationAssignments = '/association/assignments';
+  static const String associationDisputes = '/association/disputes';
+  static String associationDisputeDetail(String disputeId) => '/association/disputes/$disputeId';
+  static const String associationPayments = '/association/payments';
+  static const String associationAnalytics = '/association/analytics';
+
+  // Phase 6 Endpoints — Super Admin Platform Governance
+  static const String adminDashboard = '/admin/dashboard';
+  static const String adminUsers = '/admin/users';
+  static String adminUserRole(String userId) => '/admin/users/$userId/role';
+  static const String adminFederationTree = '/admin/federation-tree';
+  static const String adminCooperatives = '/admin/cooperatives';
+  static String adminCooperativeDetail(String coopId) => '/admin/cooperatives/$coopId';
+  static const String adminWorkers = '/admin/workers';
+  static String adminWorkerDetail(String workerId) => '/admin/workers/$workerId';
+  static const String adminBookings = '/admin/bookings';
+  static const String adminPayments = '/admin/payments';
+  static const String adminDisputes = '/admin/disputes';
+  static String adminResolveDispute(String complaintId) => '/admin/disputes/$complaintId/resolve';
+  static const String adminAuditLogs = '/admin/audit-logs';
+  static const String adminAnalytics = '/admin/analytics';
 }
 

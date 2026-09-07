@@ -185,4 +185,9 @@ class AuthProvider with ChangeNotifier {
     }
     notifyListeners();
   }
+
+  void setCurrentUserForTesting(User user) {
+    _currentUser = user;
+    notifyListeners();
+  }
 }

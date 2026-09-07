@@ -1744,6 +1744,600 @@ class ApiService {
       return true;
     }
   }
+
+  // =========================================================================
+  // PHASE 6: ASSOCIATION HEAD SCOPED MANAGEMENT
+  // =========================================================================
+
+  Future<Map<String, dynamic>?> getAssociationDashboard({String? cooperativeId}) async {
+    try {
+      final res = await _dio.get(
+        ApiConfig.associationDashboard,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAssociationDashboard error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>> getAssociationWorkers({
+    String? skill,
+    bool? availability,
+    double? ratingMin,
+    String? search,
+    int page = 1,
+    int limit = 20,
+    String? cooperativeId,
+  }) async {
+    try {
+      final q = <String, dynamic>{
+        'page': page,
+        'limit': limit,
+      };
+      if (skill != null && skill.isNotEmpty) q['skill'] = skill;
+      if (availability != null) q['availability'] = availability;
+      if (ratingMin != null) q['rating_min'] = ratingMin;
+      if (search != null && search.isNotEmpty) q['search'] = search;
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+
+      final res = await _dio.get(ApiConfig.associationWorkers, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAssociationWorkers error: $e');
+    }
+    return {'total': 0, 'workers': []};
+  }
+
+  Future<bool> updateAssociationWorker({
+    required String workerId,
+    String? phone,
+    String? skill,
+    bool? isAvailable,
+    bool? active,
+    String? cooperativeId,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (phone != null) data['phone'] = phone;
+      if (skill != null) data['skill'] = skill;
+      if (isAvailable != null) data['is_available'] = isAvailable;
+      if (active != null) data['active'] = active;
+
+      final res = await _dio.patch(
+        ApiConfig.associationWorkerDetail(workerId),
+        data: data,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('updateAssociationWorker error: $e');
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAssociationServices({
+    String? category,
+    bool? isActive,
+    String? search,
+    String? cooperativeId,
+  }) async {
+    try {
+      final q = <String, dynamic>{};
+      if (category != null) q['category'] = category;
+      if (isActive != null) q['is_active'] = isActive;
+      if (search != null) q['search'] = search;
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+
+      final res = await _dio.get(ApiConfig.associationServices, queryParameters: q);
+      if (res.data is Map && res.data['services'] is List) {
+        return (res.data['services'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      }
+    } catch (e) {
+      debugPrint('getAssociationServices error: $e');
+    }
+    return [];
+  }
+
+  Future<bool> createAssociationService({
+    required String name,
+    required String category,
+    required double basePrice,
+    String? description,
+    String? unit,
+    bool isActive = true,
+    String? cooperativeId,
+  }) async {
+    try {
+      final data = {
+        'name': name,
+        'category': category,
+        'base_price': basePrice,
+        'description': description,
+        'unit': unit ?? 'job',
+        'is_active': isActive,
+      };
+      final res = await _dio.post(
+        ApiConfig.associationServices,
+        data: data,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      return res.statusCode == 201;
+    } catch (e) {
+      debugPrint('createAssociationService error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateAssociationService({
+    required String serviceId,
+    String? name,
+    String? category,
+    String? description,
+    double? basePrice,
+    String? unit,
+    bool? isActive,
+    String? cooperativeId,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (name != null) data['name'] = name;
+      if (category != null) data['category'] = category;
+      if (description != null) data['description'] = description;
+      if (basePrice != null) data['base_price'] = basePrice;
+      if (unit != null) data['unit'] = unit;
+      if (isActive != null) data['is_active'] = isActive;
+
+      final res = await _dio.patch(
+        ApiConfig.associationServiceDetail(serviceId),
+        data: data,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('updateAssociationService error: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> getAssociationBookings({
+    String? status,
+    String? paymentStatus,
+    bool? isEmergency,
+    String? timeFilter,
+    String? search,
+    int page = 1,
+    int limit = 20,
+    String? cooperativeId,
+  }) async {
+    try {
+      final q = <String, dynamic>{'page': page, 'limit': limit};
+      if (status != null) q['status'] = status;
+      if (paymentStatus != null) q['payment_status'] = paymentStatus;
+      if (isEmergency != null) q['is_emergency'] = isEmergency;
+      if (timeFilter != null) q['time_filter'] = timeFilter;
+      if (search != null) q['search'] = search;
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+
+      final res = await _dio.get(ApiConfig.associationBookings, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAssociationBookings error: $e');
+    }
+    return {'total': 0, 'bookings': []};
+  }
+
+  Future<List<Map<String, dynamic>>> getAssociationOperations({String? cooperativeId}) async {
+    try {
+      final res = await _dio.get(
+        ApiConfig.associationOperations,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      if (res.data is Map && res.data['operations'] is List) {
+        return (res.data['operations'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      }
+    } catch (e) {
+      debugPrint('getAssociationOperations error: $e');
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> getAssociationAssignments({String? cooperativeId}) async {
+    try {
+      final res = await _dio.get(
+        ApiConfig.associationAssignments,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      if (res.data is Map && res.data['assignments'] is List) {
+        return (res.data['assignments'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      }
+    } catch (e) {
+      debugPrint('getAssociationAssignments error: $e');
+    }
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> getAssociationDisputes({
+    String? status,
+    int page = 1,
+    int limit = 20,
+    String? cooperativeId,
+  }) async {
+    try {
+      final q = <String, dynamic>{'page': page, 'limit': limit};
+      if (status != null) q['status'] = status;
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+
+      final res = await _dio.get(ApiConfig.associationDisputes, queryParameters: q);
+      if (res.data is Map && res.data['disputes'] is List) {
+        return (res.data['disputes'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      }
+    } catch (e) {
+      debugPrint('getAssociationDisputes error: $e');
+    }
+    return [];
+  }
+
+  Future<bool> reviewAssociationDispute({
+    required String complaintId,
+    required String status,
+    required String resolutionNotes,
+    String? cooperativeId,
+  }) async {
+    try {
+      final res = await _dio.patch(
+        ApiConfig.associationDisputeDetail(complaintId),
+        data: {
+          'status': status,
+          'resolution_notes': resolutionNotes,
+        },
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('reviewAssociationDispute error: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getAssociationPayments({String? cooperativeId}) async {
+    try {
+      final res = await _dio.get(
+        ApiConfig.associationPayments,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAssociationPayments error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> getAssociationAnalytics({String? cooperativeId}) async {
+    try {
+      final res = await _dio.get(
+        ApiConfig.associationAnalytics,
+        queryParameters: cooperativeId != null ? {'cooperative_id': cooperativeId} : null,
+      );
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAssociationAnalytics error: $e');
+    }
+    return null;
+  }
+
+  // =========================================================================
+  // PHASE 6: SUPER ADMIN PLATFORM GOVERNANCE
+  // =========================================================================
+
+  Future<Map<String, dynamic>?> getSuperAdminDashboard() async {
+    try {
+      final res = await _dio.get(ApiConfig.adminDashboard);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getSuperAdminDashboard error: $e');
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>> getAdminUsers({
+    String? role,
+    String? search,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final q = <String, dynamic>{'page': page, 'limit': limit};
+      if (role != null) q['role'] = role;
+      if (search != null) q['search'] = search;
+
+      final res = await _dio.get(ApiConfig.adminUsers, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAdminUsers error: $e');
+    }
+    return {'total': 0, 'users': []};
+  }
+
+  Future<bool> updateAdminUserRole({
+    required String userId,
+    required String role,
+    String? cooperativeId,
+  }) async {
+    try {
+      final res = await _dio.patch(ApiConfig.adminUserRole(userId), data: {
+        'role': role,
+        'cooperative_id': cooperativeId,
+      });
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('updateAdminUserRole error: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getAdminFederationTree() async {
+    try {
+      final res = await _dio.get(ApiConfig.adminFederationTree);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAdminFederationTree error: $e');
+    }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> getAdminCooperatives({
+    String? district,
+    String? search,
+  }) async {
+    try {
+      final q = <String, dynamic>{};
+      if (district != null) q['district'] = district;
+      if (search != null) q['search'] = search;
+
+      final res = await _dio.get(ApiConfig.adminCooperatives, queryParameters: q);
+      if (res.data is Map && res.data['cooperatives'] is List) {
+        return (res.data['cooperatives'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      }
+    } catch (e) {
+      debugPrint('getAdminCooperatives error: $e');
+    }
+    return [];
+  }
+
+  Future<bool> createAdminCooperative({
+    required String name,
+    required String district,
+    String? state,
+    String? address,
+    String? registrationNumber,
+    String? contactEmail,
+    String? contactPhone,
+    bool verified = true,
+  }) async {
+    try {
+      final res = await _dio.post(ApiConfig.adminCooperatives, data: {
+        'name': name,
+        'district': district,
+        'state': state ?? 'Tamil Nadu',
+        'address': address,
+        'registration_number': registrationNumber,
+        'contact_email': contactEmail,
+        'contact_phone': contactPhone,
+        'verified': verified,
+      });
+      return res.statusCode == 201;
+    } catch (e) {
+      debugPrint('createAdminCooperative error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> updateAdminCooperative({
+    required String coopId,
+    String? name,
+    String? district,
+    String? state,
+    String? address,
+    String? registrationNumber,
+    bool? verified,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (name != null) data['name'] = name;
+      if (district != null) data['district'] = district;
+      if (state != null) data['state'] = state;
+      if (address != null) data['address'] = address;
+      if (registrationNumber != null) data['registration_number'] = registrationNumber;
+      if (verified != null) data['verified'] = verified;
+
+      final res = await _dio.patch(ApiConfig.adminCooperativeDetail(coopId), data: data);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('updateAdminCooperative error: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> getAdminAllWorkers({
+    String? workerType,
+    String? skill,
+    bool? verifiedStatus,
+    String? search,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final q = <String, dynamic>{'page': page, 'limit': limit};
+      if (workerType != null) q['worker_type'] = workerType;
+      if (skill != null) q['skill'] = skill;
+      if (verifiedStatus != null) q['verified_status'] = verifiedStatus;
+      if (search != null) q['search'] = search;
+
+      final res = await _dio.get(ApiConfig.adminWorkers, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAdminAllWorkers error: $e');
+    }
+    return {'total': 0, 'workers': []};
+  }
+
+  Future<bool> updateAdminWorker({
+    required String workerId,
+    String? phone,
+    String? skill,
+    bool? isAvailable,
+    bool? active,
+    bool? verifiedStatus,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (phone != null) data['phone'] = phone;
+      if (skill != null) data['skill'] = skill;
+      if (isAvailable != null) data['is_available'] = isAvailable;
+      if (active != null) data['active'] = active;
+      if (verifiedStatus != null) data['verified_status'] = verifiedStatus;
+
+      final res = await _dio.patch(ApiConfig.adminWorkerDetail(workerId), data: data);
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('updateAdminWorker error: $e');
+      return false;
+    }
+  }
+
+  Future<Map<String, dynamic>> getAdminBookings({
+    String? cooperativeId,
+    String? status,
+    String? paymentStatus,
+    bool? isEmergency,
+    String? search,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final q = <String, dynamic>{'page': page, 'limit': limit};
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+      if (status != null) q['status'] = status;
+      if (paymentStatus != null) q['payment_status'] = paymentStatus;
+      if (isEmergency != null) q['is_emergency'] = isEmergency;
+      if (search != null) q['search'] = search;
+
+      final res = await _dio.get(ApiConfig.adminBookings, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAdminBookings error: $e');
+    }
+    return {'total': 0, 'bookings': []};
+  }
+
+  Future<Map<String, dynamic>?> getAdminPayments({
+    String? settlementStatus,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final q = <String, dynamic>{'page': page, 'limit': limit};
+      if (settlementStatus != null) q['settlement_status'] = settlementStatus;
+
+      final res = await _dio.get(ApiConfig.adminPayments, queryParameters: q);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAdminPayments error: $e');
+    }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> getAdminDisputes({
+    String? status,
+    String? cooperativeId,
+  }) async {
+    try {
+      final q = <String, dynamic>{};
+      if (status != null) q['status'] = status;
+      if (cooperativeId != null) q['cooperative_id'] = cooperativeId;
+
+      final res = await _dio.get(ApiConfig.adminDisputes, queryParameters: q);
+      if (res.data is Map && res.data['disputes'] is List) {
+        return (res.data['disputes'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      }
+    } catch (e) {
+      debugPrint('getAdminDisputes error: $e');
+    }
+    return [];
+  }
+
+  Future<bool> resolveDisputeWithRefund({
+    required String complaintId,
+    required String status,
+    required String resolutionNotes,
+    bool refundApproved = false,
+  }) async {
+    try {
+      final res = await _dio.post(ApiConfig.adminResolveDispute(complaintId), data: {
+        'status': status,
+        'resolution_notes': resolutionNotes,
+        'refund_approved': refundApproved,
+      });
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('resolveDisputeWithRefund error: $e');
+      return false;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAdminAuditLogs({
+    String? targetType,
+    int limit = 50,
+  }) async {
+    try {
+      final q = <String, dynamic>{'limit': limit};
+      if (targetType != null) q['target_type'] = targetType;
+
+      final res = await _dio.get(ApiConfig.adminAuditLogs, queryParameters: q);
+      if (res.data is Map && res.data['audit_logs'] is List) {
+        return (res.data['audit_logs'] as List).whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      }
+    } catch (e) {
+      debugPrint('getAdminAuditLogs error: $e');
+    }
+    return [];
+  }
+
+  Future<Map<String, dynamic>?> getAdminAnalytics() async {
+    try {
+      final res = await _dio.get(ApiConfig.adminAnalytics);
+      if (res.data is Map) {
+        return Map<String, dynamic>.from(res.data);
+      }
+    } catch (e) {
+      debugPrint('getAdminAnalytics error: $e');
+    }
+    return null;
+  }
 }
 
 

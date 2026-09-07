@@ -57,9 +57,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       if (auth.isAuthenticated) {
-        if (auth.currentRole == UserRole.worker) {
+        if (auth.currentRole == UserRole.cooperativeWorker || auth.currentRole == UserRole.independentWorker) {
           Navigator.pushReplacementNamed(context, AppRoutes.workerHome);
-        } else if (auth.currentRole == UserRole.admin) {
+        } else if (auth.currentRole == UserRole.cooperativeAssociationHead || auth.currentRole == UserRole.superAdmin) {
           Navigator.pushReplacementNamed(context, '/admin_dashboard');
         } else {
           Navigator.pushReplacementNamed(context, AppRoutes.householdHome);
