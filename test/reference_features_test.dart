@@ -50,8 +50,8 @@ void main() {
 
       // 4 Quick Demo Tiles
       expect(find.text('Quick Demo Accounts (1-Tap Login)'), findsOneWidget);
-      expect(find.text('Demo Customer (Abhinaya)'), findsOneWidget);
-      expect(find.text('Demo Worker (Ravi Kumar)'), findsOneWidget);
+      expect(find.text('Demo Customer (Ananya Sharma)'), findsOneWidget);
+      expect(find.text('Demo Worker (Ramesh Kumar)'), findsOneWidget);
       expect(find.text('Demo Cooperative (Priya Menon)'), findsOneWidget);
       expect(find.text('Demo Platform Admin'), findsOneWidget);
     });

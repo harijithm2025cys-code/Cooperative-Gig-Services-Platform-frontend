@@ -620,11 +620,11 @@ class ApiService {
       } else {
         currentUser = const User(
           id: 'usr_house_01',
-          name: 'Harijith M',
+          name: 'Ananya Sharma',
           phone: '+91 98765 12345',
-          email: 'harijith@example.com',
+          email: 'ananya@example.com',
           role: UserRole.customer,
-          address: 'Flat 402, Green Glen Layout, Koramangala, Bengaluru',
+          address: 'Flat 402, Green Glen Layout, Bellandur, Bengaluru',
           token: 'jwt_token_demo_household',
         );
       }

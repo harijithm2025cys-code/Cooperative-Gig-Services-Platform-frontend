@@ -277,8 +277,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // 1. Customer Demo Tile
               _DemoLoginTile(
-                title: isTamil ? 'டெமோ வாடிக்கையாளர் (அபினயா / அனன்யா)' : 'Demo Customer (Abhinaya)',
-                subtitle: isTamil ? 'சேவை முன்பதிவு, வரைபடம், கட்டணம்' : 'Book services, view map, checkout',
+                title: isTamil ? 'டெமோ வாடிக்கையாளர் (அனன்யா ஷர்மா)' : 'Demo Customer (Ananya Sharma)',
+                subtitle: isTamil ? 'அனன்யா ஷர்மா - சேவை முன்பதிவு, வரைபடம், கட்டணம்' : 'Ananya Sharma - Book services, view map, checkout',
                 icon: Icons.person_rounded,
                 color: const Color(0xFF4F46E5),
                 onTap: () => _handleLogin('ananya@example.com', 'Demo@2024', UserRole.customer),
@@ -287,8 +287,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
               // 2. Worker Demo Tile
               _DemoLoginTile(
-                title: isTamil ? 'டெமோ தொழிலாளர் (ரவி குமார்)' : 'Demo Worker (Ravi Kumar)',
-                subtitle: isTamil ? 'வேலை ஏற்க, வருவாய் & பணப்பை விவரங்கள்' : 'Accept job requests, view wallet & earnings',
+                title: isTamil ? 'டெமோ தொழிலாளர் (ரமேஷ் குமார்)' : 'Demo Worker (Ramesh Kumar)',
+                subtitle: isTamil ? 'ரமேஷ் குமார் - வேலை ஏற்க, வருவாய் & பணப்பை விவரங்கள்' : 'Ramesh Kumar - Accept job requests, view wallet & earnings',
                 icon: Icons.handyman_rounded,
                 color: const Color(0xFF10B981),
                 onTap: () => _handleLogin('ramesh.worker@coop.org', 'Demo@2024', UserRole.cooperativeWorker),
