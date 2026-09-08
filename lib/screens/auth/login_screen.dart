@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
-import '../../utils/app_colors.dart';
 import '../../utils/constants.dart';
-import '../../l10n/app_localizations.dart';
 import '../../widgets/language_selector.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -15,391 +13,385 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController(text: 'ananya@example.com');
-  final _passwordController = TextEditingController(text: 'password123');
-
-  UserRole _selectedRole = UserRole.household;
+  final _phoneOrEmailController = TextEditingController(text: '+919876543210');
+  final _passwordController = TextEditingController(text: 'Demo@2024');
+  bool _isLoading = false;
   bool _obscurePassword = true;
-  bool _isAdminMode = false;
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _phoneOrEmailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _onRoleChanged(UserRole role) {
-    setState(() {
-      _selectedRole = role;
-      _isAdminMode = (role == UserRole.admin);
-      if (role == UserRole.worker) {
-        _usernameController.text = 'ramesh.worker@coop.org';
-        _passwordController.text = 'worker123';
-      } else if (role == UserRole.admin) {
-        _usernameController.text = 'admin@coop.org';
-        _passwordController.text = 'admin123';
-      } else {
-        _usernameController.text = 'ananya@example.com';
-        _passwordController.text = 'password123';
-      }
-    });
-  }
-
-  void _toggleAdminMode() {
-    setState(() {
-      _isAdminMode = !_isAdminMode;
-      _onRoleChanged(_isAdminMode ? UserRole.admin : UserRole.household);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isAdminMode ? '🔐 Switched to Cooperative Admin Portal' : 'Switched to Public User Portal'),
-        duration: const Duration(seconds: 1),
-        backgroundColor: _isAdminMode ? const Color(0xFF0F766E) : AppColors.primary,
-      ),
-    );
-  }
-
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
-
+  Future<void> _handleLogin(String identifier, String password, UserRole role) async {
+    setState(() => _isLoading = true);
     final auth = Provider.of<AuthProvider>(context, listen: false);
+
     final success = await auth.login(
-      username: _usernameController.text.trim(),
-      password: _passwordController.text,
-      role: _selectedRole,
+      username: identifier.trim(),
+      password: password,
+      role: role,
     );
 
     if (!mounted) return;
+    setState(() => _isLoading = false);
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Signed in as ${_selectedRole.label} (Connected to Supabase)'),
-          backgroundColor: AppColors.statusCompleted,
+          content: Text('Logged in as ${role.label} (${auth.currentUser?.name ?? "User"})'),
+          backgroundColor: const Color(0xFF10B981),
+          duration: const Duration(seconds: 2),
         ),
       );
 
-      if (_selectedRole == UserRole.worker) {
-        Navigator.pushReplacementNamed(context, AppRoutes.workerHome);
-      } else if (_selectedRole == UserRole.admin) {
-        Navigator.pushReplacementNamed(context, '/admin_dashboard');
-      } else {
-        Navigator.pushReplacementNamed(context, AppRoutes.householdHome);
+      switch (role) {
+        case UserRole.cooperativeWorker:
+        case UserRole.independentWorker:
+          Navigator.pushNamedAndRemoveUntil(context, AppRoutes.workerHome, (r) => false);
+          break;
+        case UserRole.cooperativeAssociationHead:
+        case UserRole.superAdmin:
+          Navigator.pushNamedAndRemoveUntil(context, '/admin_dashboard', (r) => false);
+          break;
+        case UserRole.customer:
+          Navigator.pushNamedAndRemoveUntil(context, AppRoutes.householdHome, (r) => false);
+          break;
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(auth.errorMessage ?? 'Sign in failed. Check credentials.'),
-          backgroundColor: AppColors.statusCancelled,
+          backgroundColor: const Color(0xFFEF4444),
         ),
       );
     }
   }
 
+  void _submitForm() {
+    final input = _phoneOrEmailController.text.trim();
+    final pwd = _passwordController.text;
+
+    // Detect target role based on input pattern or default to customer
+    UserRole targetRole = UserRole.customer;
+    if (input.contains('worker')) {
+      targetRole = UserRole.cooperativeWorker;
+    } else if (input.contains('admin') || input.contains('coop')) {
+      targetRole = UserRole.superAdmin;
+    }
+
+    _handleLogin(input, pwd, targetRole);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final auth = Provider.of<AuthProvider>(context);
+    final isTamil = Localizations.localeOf(context).languageCode == 'ta';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF8FAFC),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: Text(
+          isTamil ? 'உள்நுழைவு' : 'Login',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A)),
+        ),
+        actions: [
+          const LanguageSelector(compact: true),
+          const SizedBox(width: 8),
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD1FAE5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFA7F3D0)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.circle, color: Color(0xFF10B981), size: 8),
+                SizedBox(width: 5),
+                Text(
+                  'Supabase Live',
+                  style: TextStyle(color: Color(0xFF065F46), fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-            child: Card(
-              elevation: 0,
-              color: AppColors.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: const BorderSide(color: AppColors.border, width: 1.2),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Welcome Header
+              Text(
+                isTamil ? 'மீண்டும் வருக!' : 'Welcome Back',
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.5,
+                ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top Row with Language Switcher and Discreet Admin Access
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const LanguageSelector(compact: true),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryContainer.withValues(alpha: 0.6),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Row(
-                                  children: [
-                                    Icon(Icons.cloud_done_rounded, size: 12, color: AppColors.primaryDark),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      'Supabase DB',
-                                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: AppColors.primaryDark),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              // Hidden/discreet admin lock toggle
-                              IconButton(
-                                icon: Icon(
-                                  _isAdminMode ? Icons.admin_panel_settings : Icons.lock_outline_rounded,
-                                  size: 19,
-                                  color: _isAdminMode ? AppColors.primary : AppColors.textTertiary,
-                                ),
-                                tooltip: _isAdminMode ? 'Exit Admin Mode' : 'Admin Portal Access',
-                                onPressed: _toggleAdminMode,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
+              const SizedBox(height: 6),
+              Text(
+                isTamil
+                    ? 'உங்கள் தொலைபேசி எண் அல்லது மின்னஞ்சல் மூலம் உள்நுழைக'
+                    : 'Login with your phone number or email',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 28),
 
-                      // Header Icon
-                      Center(
-                        child: Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            color: _isAdminMode ? const Color(0xFFCCFBF1) : AppColors.primaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _isAdminMode ? Icons.admin_panel_settings_rounded : Icons.handshake_outlined,
-                            size: 34,
-                            color: _isAdminMode ? const Color(0xFF0F766E) : AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Center(
-                        child: Text(
-                          _isAdminMode
-                              ? 'Cooperative Admin Portal'
-                              : AppLocalizations.of(context).login,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Center(
-                        child: Text(
-                          _isAdminMode
-                              ? 'Authorised Guild Staff & Auditors Only'
-                              : AppLocalizations.of(context).appTagline,
-                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Role Selector Segmented Button (Only Household & Worker visible publicly)
-                      if (!_isAdminMode) ...[
-                        SegmentedButton<UserRole>(
-                          segments: const [
-                            ButtonSegment(
-                              value: UserRole.customer,
-                              label: Text('Customer', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                              icon: Icon(Icons.home_outlined, size: 18),
-                            ),
-                            ButtonSegment(
-                              value: UserRole.cooperativeWorker,
-                              label: Text('Worker-Owner', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                              icon: Icon(Icons.handyman_outlined, size: 18),
-                            ),
-                          ],
-                          selected: {_selectedRole},
-                          onSelectionChanged: (set) => _onRoleChanged(set.first),
-                          style: ButtonStyle(
-                            shape: WidgetStatePropertyAll(
-                              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ] else ...[
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0FDFA),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFF99F6E4)),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.shield_outlined, color: Color(0xFF0F766E), size: 20),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Admin Mode Active (Supervisory Access)',
-                                  style: TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.bold, fontSize: 12),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Username/Email Field
-                      const Text('Email or Phone', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _usernameController,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
-                          prefixIcon: const Icon(Icons.person_outline_rounded, color: AppColors.primary, size: 20),
-                          hintText: 'Enter email or phone',
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                        ),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter your username' : null,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Password Field
-                      const Text('Password', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: Colors.grey.shade50,
-                          prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.primary, size: 20),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                              color: AppColors.textSecondary,
-                              size: 20,
-                            ),
-                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                          ),
-                          hintText: 'Enter password',
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-                        ),
-                        validator: (v) => (v == null || v.isEmpty) ? 'Please enter password' : null,
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Pre-filled Demo badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.bolt_rounded, size: 16, color: AppColors.primary),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                'Supabase Test Account: ${_selectedRole.label}',
-                                style: const TextStyle(fontSize: 11.5, color: AppColors.primaryDark, fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Sign In Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: auth.isLoading ? null : _handleLogin,
-                          child: auth.isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                                )
-                              : Text(
-                                  _isAdminMode ? 'Access Admin Dashboard' : 'Sign In',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Register Link
-                      if (!_isAdminMode) ...[
-                        Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text(
-                                "New member? ",
-                                style: TextStyle(color: AppColors.textSecondary, fontSize: 13.5),
-                              ),
-                              GestureDetector(
-                                onTap: () {
-                                  Navigator.pushNamed(context, AppRoutes.signup, arguments: _selectedRole);
-                                },
-                                child: const Text(
-                                  'Register Now',
-                                  style: TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13.5,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        // Hidden/Discreet Admin Footer Link
-                        Center(
-                          child: TextButton.icon(
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.textTertiary,
-                              textStyle: const TextStyle(fontSize: 11),
-                            ),
-                            icon: const Icon(Icons.shield_outlined, size: 13),
-                            label: const Text('Co-op Officer / Admin Access'),
-                            onPressed: _toggleAdminMode,
-                          ),
-                        ),
-                      ] else ...[
-                        Center(
-                          child: TextButton.icon(
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                            icon: const Icon(Icons.arrow_back_rounded, size: 14),
-                            label: const Text('Back to Member Sign In'),
-                            onPressed: _toggleAdminMode,
-                          ),
-                        ),
-                      ],
-                    ],
+              // Phone / Email Field
+              Text(
+                isTamil ? 'தொலைபேசி / மின்னஞ்சல்' : 'Phone / Email',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF0F172A)),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _phoneOrEmailController,
+                style: const TextStyle(color: Color(0xFF0F172A)),
+                decoration: InputDecoration(
+                  hintText: isTamil ? 'தொலைபேசி அல்லது மின்னஞ்சல்' : 'Enter phone or email',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF4F46E5)),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(height: 18),
+
+              // Password Field
+              Text(
+                isTamil ? 'கடவுச்சொல்' : 'Password',
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF0F172A)),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                style: const TextStyle(color: Color(0xFF0F172A)),
+                decoration: InputDecoration(
+                  hintText: isTamil ? 'கடவுச்சொல்லை உள்ளிடவும்' : 'Enter password',
+                  hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+                  prefixIcon: const Icon(Icons.lock_outline_rounded, color: Color(0xFF4F46E5)),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Login Button
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _submitForm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(
+                          isTamil ? 'உள்நுழைய' : 'Login',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Register Link
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.pushNamed(context, AppRoutes.signup),
+                  child: Text(
+                    isTamil ? 'கணக்கு இல்லையா? பதிவு செய்க' : "Don't have an account? Register",
+                    style: const TextStyle(color: Color(0xFF4F46E5), fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+              const Divider(color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 12),
+
+              // Demo Accounts Header
+              Center(
+                child: Text(
+                  isTamil ? 'விரைவு டெமோ கணக்குகள் (ஒரே தட்டலில் உள்நுழைவு)' : 'Quick Demo Accounts (1-Tap Login)',
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 1. Customer Demo Tile
+              _DemoLoginTile(
+                title: isTamil ? 'டெமோ வாடிக்கையாளர் (அபினயா / அனன்யா)' : 'Demo Customer (Abhinaya)',
+                subtitle: isTamil ? 'சேவை முன்பதிவு, வரைபடம், கட்டணம்' : 'Book services, view map, checkout',
+                icon: Icons.person_rounded,
+                color: const Color(0xFF4F46E5),
+                onTap: () => _handleLogin('ananya@example.com', 'Demo@2024', UserRole.customer),
+              ),
+              const SizedBox(height: 10),
+
+              // 2. Worker Demo Tile
+              _DemoLoginTile(
+                title: isTamil ? 'டெமோ தொழிலாளர் (ரவி குமார்)' : 'Demo Worker (Ravi Kumar)',
+                subtitle: isTamil ? 'வேலை ஏற்க, வருவாய் & பணப்பை விவரங்கள்' : 'Accept job requests, view wallet & earnings',
+                icon: Icons.handyman_rounded,
+                color: const Color(0xFF10B981),
+                onTap: () => _handleLogin('ramesh.worker@coop.org', 'Demo@2024', UserRole.cooperativeWorker),
+              ),
+              const SizedBox(height: 10),
+
+              // 3. Cooperative Demo Tile
+              _DemoLoginTile(
+                title: isTamil ? 'டெமோ கூட்டுறவு சங்கம் (பிரியா மேனன்)' : 'Demo Cooperative (Priya Menon)',
+                subtitle: isTamil ? 'உறுப்பினர் பட்டியல், வேலை ஒதுக்கீடு' : 'Manage roster, assign member jobs',
+                icon: Icons.groups_rounded,
+                color: const Color(0xFFF59E0B),
+                onTap: () => _handleLogin('admin@abccoop.org', 'Demo@2024', UserRole.cooperativeAssociationHead),
+              ),
+              const SizedBox(height: 10),
+
+              // 4. Platform Admin Demo Tile
+              _DemoLoginTile(
+                title: isTamil ? 'டெமோ பிளாட்ஃபார்ம் நிர்வாகி' : 'Demo Platform Admin',
+                subtitle: isTamil ? 'KYC ஒப்புதல், பகுப்பாய்வு & புள்ளிவிவரங்கள்' : 'KYC approval queue, analytics & stats',
+                icon: Icons.admin_panel_settings_rounded,
+                color: const Color(0xFF7C3AED),
+                onTap: () => _handleLogin('admin@coop.org', 'Demo@2024', UserRole.superAdmin),
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DemoLoginTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _DemoLoginTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x05000000),
+              blurRadius: 4,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF94A3B8)),
+          ],
         ),
       ),
     );

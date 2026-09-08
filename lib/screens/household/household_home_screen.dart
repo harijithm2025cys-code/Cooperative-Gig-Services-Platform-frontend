@@ -15,6 +15,9 @@ import 'service_picker_screen.dart';
 import 'book_service_screen.dart';
 import 'bulk_booking_screen.dart';
 import 'emergency_booking_screen.dart';
+import 'problem_description_screen.dart';
+import '../chat/chatbot_screen.dart';
+import '../welfare/welfare_screen.dart';
 
 class HouseholdHomeScreen extends StatefulWidget {
   const HouseholdHomeScreen({super.key});
@@ -302,6 +305,118 @@ class _HouseholdHomeScreenState extends State<HouseholdHomeScreen> {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+
+              // AI Problem Matcher & Welfare Hub Row
+              Row(
+                children: [
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ProblemDescriptionScreen()),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF4F46E5).withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    Localizations.localeOf(context).languageCode == 'ta' ? 'AI பிரச்சனை' : 'AI Matcher',
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13.5),
+                                  ),
+                                  Text(
+                                    Localizations.localeOf(context).languageCode == 'ta' ? 'விவரித்து தேடு' : 'Describe Issue',
+                                    style: const TextStyle(color: Colors.white70, fontSize: 10.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const WelfareScreen()),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+                          boxShadow: const [
+                            BoxShadow(color: Color(0x05000000), blurRadius: 6, offset: Offset(0, 2)),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(color: Color(0xFFCCFBF1), shape: BoxShape.circle),
+                              child: const Icon(Icons.volunteer_activism_rounded, color: Color(0xFF0F766E), size: 18),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    Localizations.localeOf(context).languageCode == 'ta' ? 'நலத்திட்டம்' : 'Welfare Hub',
+                                    style: const TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.bold, fontSize: 13.5),
+                                  ),
+                                  Text(
+                                    Localizations.localeOf(context).languageCode == 'ta' ? 'காப்பீடு & நிதி' : 'Insurance & Fund',
+                                    style: const TextStyle(color: Color(0xFF14B8A6), fontSize: 10.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 24),
 
               // Active Booking Status Card (if any pending/accepted/in_progress)
@@ -435,6 +550,22 @@ class _HouseholdHomeScreenState extends State<HouseholdHomeScreen> {
                 ),
             ],
           ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ChatbotScreen()),
+          );
+        },
+        backgroundColor: const Color(0xFF4F46E5),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        icon: const Icon(Icons.smart_toy_rounded, size: 20),
+        label: Text(
+          Localizations.localeOf(context).languageCode == 'ta' ? 'AI உதவியாளர்' : 'AI Assistant',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
       ),
     );

@@ -18,6 +18,9 @@ import 'screens/household/online_consultation_screen.dart';
 import 'screens/worker/worker_home_screen.dart';
 import 'screens/worker/worker_messages_screen.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
+import 'screens/chat/chatbot_screen.dart';
+import 'screens/household/problem_description_screen.dart';
+import 'screens/welfare/welfare_screen.dart';
 import 'utils/constants.dart';
 
 Future<void> main() async {
@@ -92,6 +95,9 @@ class CooperativeGigApp extends StatelessWidget {
         '/worker_messages': (context) => const WorkerMessagesScreen(),
         AppRoutes.workerHome: (context) => const WorkerHomeScreen(),
         '/admin_dashboard': (context) => const AdminDashboardScreen(),
+        '/chat': (context) => const ChatbotScreen(),
+        '/problem_matcher': (context) => const ProblemDescriptionScreen(),
+        '/welfare': (context) => const WelfareScreen(),
       },
     );
   }
